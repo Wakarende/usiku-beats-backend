@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+# from .views import artist_detail
 from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
@@ -14,9 +15,13 @@ urlpatterns = [
     path('songs/country/<str:country_name>/', views.song_by_country, name='song-by-country'),
     path('songs/genre/<str:genre_name>/', views.song_by_genre, name='song-by-genre'),
     
+    # Artist detail
+    path('artist-detail/<int:pk>/', views.artist_detail, name='artist-detail'),
+
     path('signup/', views.signup, name='signup'),
     path('login/', views.login, name='login'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
 
     
 ]
+

@@ -213,3 +213,14 @@ def login(request):
         'data': data,
     })
 
+
+# Api to display artist detail 
+# views.py
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([permissions.IsAuthenticated])
+def artist_detail(request, pk):
+    print(f"Artist detail view called with ID: {pk}") 
+    artist = get_object_or_404(Artist, pk=pk)
+    serializer = ArtistSerializer(artist, context={'request': request})
+    return Response(serializer.data)

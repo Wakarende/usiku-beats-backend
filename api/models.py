@@ -47,16 +47,22 @@ class Profile(models.Model):
 
 class Artist(models.Model):
     profile = models.OneToOneField(
-        Profile, default=None, on_delete=models.CASCADE, null=True)
-
+        Profile, default=None, on_delete=models.CASCADE, null=True,blank=True)
+    name = models.CharField(max_length=100, null=True, blank=True)
     mpesa_number = models.IntegerField(null=True, blank=True)
     preferred_payout_method = models.CharField(choices=[('mpesa', 'mpesa')], default='mpesa', blank=True, null=True, max_length=10)
     revenue_earned = models.FloatField(blank=True, null=True)
     current_balance = models.FloatField(blank=True, null=True)
     data = models.JSONField(blank=True, null=True)
+    bio = models.TextField(null=True, blank=True)
+    spotify_link = models.URLField(null=True, blank=True)
+    twitter_link = models.URLField(null=True, blank=True)
+    youtube_link = models.URLField(null=True, blank=True)
+    instagram_link = models.URLField(null=True, blank=True)
+    website_link = models.URLField(null=True, blank=True)
 
     def __str__(self):
-        return self.profile.user
+        return self.name 
 
 
 class Payout(models.Model):

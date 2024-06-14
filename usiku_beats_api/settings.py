@@ -27,7 +27,7 @@ SECRET_KEY = 'REMOVED_SECRET'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['13.37.220.163','localhost','ip-172-31-34-216.eu-west-3.compute.internal','api.usiku.games']
+ALLOWED_HOSTS = ['13.37.220.163','localhost','ip-172-31-34-216.eu-west-3.compute.internal','api.usiku.games','127.0.0.1', 'localhost']
 
 
 # Application definition
