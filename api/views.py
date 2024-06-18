@@ -11,12 +11,13 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from .scripts import *
+from django.contrib.auth import login as auth_login
+from django.utils import timezone
 
 @api_view(['GET'])
 def apiOverview(request):
     api_urls = {
-        'List': '/song-list/',
-        'Detail View': '/song-detail/<str:pk>/'
+        'usiku-beats-api': 200
     }
 
     return Response(api_urls)
@@ -52,8 +53,15 @@ def apiOverview(request):
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([permissions.IsAuthenticated])
+# @permission_classes([permissions.IsAuthenticated])
 def songList(request):
+    
+    if request.user.is_authenticated:
+        print("user is authenticated")
+        pass
+        
+        
+    
     start = int(request.GET.get('start', 0))
     limit = int(request.GET.get('limit', 5))
 
@@ -104,8 +112,13 @@ def mdundoSongList(request):
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
-@permission_classes([permissions.IsAuthenticated])
+# @permission_classes([permissions.IsAuthenticated])
 def songDetail(request, pk):
+    
+    if request.user.is_authenticated:
+        print("User is authenticated")
+        pass
+    
     song = Song.objects.get(id=pk)
     serializer = SongSerializer(song, many=False, context={'request': request})
 
@@ -143,7 +156,7 @@ def song_by_genre(request, genre_name):
     return Response(serializer.data)
 
 
-@csrf_exempt
+# @csrf_exempt
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def signup(request):
@@ -163,13 +176,14 @@ def signup(request):
     user = User.objects.create_user(
         username=username, password=password, email=email)
     profile = Profile.objects.create(user=user, recent_ip_address=ip_address)
+    player = Player.object.create(profile=profile)
 
 
+    # auth_login(request._request, user)
     refresh = RefreshToken.for_user(user)
 
 
     data = {}
-    data['user'] = UserSerializer(user).data
     data['profile'] = ProfileSerializer(profile).data
 
 
@@ -182,7 +196,7 @@ def signup(request):
     }, status=status.HTTP_201_CREATED)
 
 
-@csrf_exempt
+# @csrf_exempt
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def login(request):
@@ -197,15 +211,14 @@ def login(request):
     if not user or not user.check_password(password):
         return Response({'error': 'Invalid email or password'}, status=status.HTTP_200_OK)
 
+    # auth_login(request._request, user)
     profile = Profile.objects.get(user=user)
     refresh = RefreshToken.for_user(user)
 
 
 
     data = {}
-    data['user'] = UserSerializer(user).data
     data['profile'] = ProfileSerializer(profile).data
-
 
     return Response({
         'refresh': str(refresh),
@@ -213,3 +226,153 @@ def login(request):
         'data': data,
     })
 
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def update_discs(request):
+    
+    player = get_object_or_404(Player, profile=request.user.profile)
+    try:
+        resource_to_add = float(request.data.get('discs', 0))
+                
+        new_total_resource = player.total_discs + resource_to_add
+        if new_total_resource < 0:
+            return Response({'error': 'Resource count cannot be less than 0'}, status=status.HTTP_400_BAD_REQUEST)
+
+        player.total_discs = new_total_resource
+        player.save()
+        serializer = PlayerSerializer(player)
+        return Response(serializer.data)
+    except Player.DoesNotExist:
+        return Response({'error': 'Player not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def update_stars(request):
+    
+    player = get_object_or_404(Player, profile=request.user.profile)
+    try:
+        resource_to_add = float(request.data.get('stars', 0))
+                
+        new_total_resource = player.total_stars + resource_to_add
+        if new_total_resource < 0:
+            return Response({'error': 'Resource count cannot be less than 0'}, status=status.HTTP_400_BAD_REQUEST)
+
+        player.total_stars = new_total_resource
+        player.save()
+        serializer = PlayerSerializer(player)
+        return Response(serializer.data)
+    except Player.DoesNotExist:
+        return Response({'error': 'Player not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def update_gems(request):
+    
+    player = get_object_or_404(Player, profile=request.user.profile)
+    try:
+        resource_to_add = float(request.data.get('gems', 0))
+                
+        new_total_resource = player.total_gems + resource_to_add
+        if new_total_resource < 0:
+            return Response({'error': 'Resource count cannot be less than 0'}, status=status.HTTP_400_BAD_REQUEST)
+
+        player.total_gems = new_total_resource
+        player.save()
+        serializer = PlayerSerializer(player)
+        return Response(serializer.data)
+    except Player.DoesNotExist:
+        return Response({'error': 'Player not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def update_level(request):
+
+    player = get_object_or_404(Player, profile=request.user.profile)
+    try:
+        resource_to_add = float(request.data.get('level', 1))
+                
+        new_total_resource = player.level + resource_to_add
+        if new_total_resource < 1:
+            return Response({'error': 'Resource count cannot be less than 1'}, status=status.HTTP_400_BAD_REQUEST)
+
+        player.level = new_total_resource
+        player.save()
+        serializer = PlayerSerializer(player)
+        return Response(serializer.data)
+    except Player.DoesNotExist:
+        return Response({'error': 'Player not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_player_songs(request):
+
+    player = get_object_or_404(Player, profile=request.user.profile)
+    instances = PlayerSongInstance.objects.filter(player=player)
+    
+    data = PlayerSongInstanceSerializer(instances, many=True).data
+    return Response(data, status=status.HTTP_200_OK)
+
+
+    
+@api_view(['PATCH'])
+@permission_classes([permissions.IsAuthenticated])
+def update_player_song_instance(request, pk):
+    player_song_instance = get_object_or_404(PlayerSongInstance, pk=pk)
+    
+    # Check if the user is authorized to update this instance
+    if player_song_instance.player.profile.user != request.user:
+        return Response({'error': 'You do not have permission to update this song instance.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    serializer = PlayerSongInstanceSerializer(player_song_instance, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    else:
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    
+    
+@api_view(['GET'])
+def get_initial_songs(request):
+    ids = request.GET.getlist('ids')  # Retrieve list of IDs from the query parameters
+    if ids:
+        songs = Song.objects.filter(id__in=ids)  # Query your model using the list of IDs
+        
+        # Create PlayerSongInstance objects with default values
+        player_song_instances = []
+        
+        for song in songs:
+            song_data = SongSerializer(song, context={'request': request}).data  # Serialize Song object
+            player_song_instance = {
+                'song': song_data,
+                'high_score': 0,
+                'no_of_plays': 0,
+                'date_added': timezone.now(),
+                'unlock_time': None,
+                'unlocked': True,
+                'maximum_progress': 0.0,
+                'paid_for_flag': False,
+                'favourited': False,
+                'data': {}
+            }
+            player_song_instances.append(player_song_instance)
+
+        # Serialize the PlayerSongInstance objects
+        return Response(player_song_instances, status=status.HTTP_200_OK)
+    
+    return Response({'error': 'No IDs provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+@api_view(['GET'])
+def artist_detail(request, pk):
+    
+    artist = get_object_or_404(Artist, pk=pk)
+    serializer = ArtistSerializer(artist, context={'request': request})
+    return Response(serializer.data, status=status.HTTP_200_OK)

@@ -12,51 +12,30 @@ class Profile(models.Model):
 
     def __str__(self):
         return self.user.email
-    
-    #     def sms_user(self,message):
-    #     username = "emeden" 
-    #     api_key = "REMOVED_SECRET"
-    #     africastalking.initialize(username, api_key) 
-    #     sms = africastalking.SMS
-    #     sms.send(message, ["+" + str(self.phone)], sender_id="EMEDEN")
 
-    #     #Add to database
-    #     message_model = Message()
-    #     message_model.profile = self
-    #     message_model.message = message
-    #     message_model.message_type = 'SMS'
-    #     message_model.save()
-    #     return 0
-
-    # def email_user(self,message,subject="EMEDEN Kenya Farmers"):
-    #     send_mail(
-    #              subject,
-    #              message,
-    #             'info@emedenkenyafarmers.co.ke',
-    #              [self.user.email],
-    #              fail_silently=True,
-    #              )
-    #     #Add to database
-    #     message_model = Message()
-    #     message_model.profile = self
-    #     message_model.message = message
-    #     message_model.message_type = 'Email'
-    #     message_model.save()
-    #     return 0
 
 
 class Artist(models.Model):
     profile = models.OneToOneField(
         Profile, default=None, on_delete=models.CASCADE, null=True)
 
+    name = models.CharField(max_length=100, null=True, blank=True)
     mpesa_number = models.IntegerField(null=True, blank=True)
     preferred_payout_method = models.CharField(choices=[('mpesa', 'mpesa')], default='mpesa', blank=True, null=True, max_length=10)
     revenue_earned = models.FloatField(blank=True, null=True)
     current_balance = models.FloatField(blank=True, null=True)
+    
+    bio = models.TextField(null=True, blank=True)
+    spotify_link = models.URLField(null=True, blank=True)
+    twitter_link = models.URLField(null=True, blank=True)
+    youtube_link = models.URLField(null=True, blank=True)
+    instagram_link = models.URLField(null=True, blank=True)
+    website_link = models.URLField(null=True, blank=True)
+    
     data = models.JSONField(blank=True, null=True)
 
     def __str__(self):
-        return self.profile.user
+        return self.name
 
 
 class Payout(models.Model):
@@ -71,16 +50,6 @@ class Payout(models.Model):
     def __str__(self):
         return f'{self.date} {self.artist}'
 
-
-class Player(models.Model):
-    profile = models.OneToOneField(
-        Profile, default=None, on_delete=models.CASCADE, null=True)
-
-    calibration = models.FloatField(blank=True, null=True)
-    data = models.JSONField(blank=True, null=True)
-
-    def __str__(self):
-        return self.profile.user
 
 
 class Genre(models.Model):
@@ -154,20 +123,42 @@ class Song(models.Model):
         return f'{self.artist_name} - {self.song_name} - {self.id}'
 
 
+class Player(models.Model):
+    profile = models.OneToOneField(
+        Profile, default=None, on_delete=models.CASCADE, null=True)
+
+    calibration = models.FloatField(blank=True, null=True)
+    
+    level = models.IntegerField(default=1)
+    total_discs = models.FloatField(default=0)
+    total_gems = models.FloatField(default=0)
+    total_stars = models.FloatField(default=0)
+
+    
+    data = models.JSONField(blank=True, null=True)
+
+    def __str__(self):
+        return self.profile.user.email
+    
+    
 class PlayerSongInstance(models.Model):
     song = models.ForeignKey(
         Song, on_delete=models.CASCADE, null=True, blank=True)
     
     player = models.ForeignKey(
-        Player, on_delete=models.CASCADE, null=True, blank=True)
+        Player, on_delete=models.CASCADE, null=True, blank=True, related_name='player_song_instances')
     
-    date_first_played = models.DateTimeField(auto_now_add=True)
-    date_last_played = models.DateTimeField(auto_now=True)
-    high_score = models.IntegerField(blank=True, null=True)
-    # no_of_plays = models.IntegerField(blank=True, null=True)
+    date_added = models.DateTimeField(auto_now_add=True)
+    # date_last_played = models.DateTimeField(auto_now=True)
+    high_score = models.BigIntegerField(default=0)
+    
+    no_of_plays = models.BigIntegerField(default=0)
+    unlock_time = models.DateTimeField(blank=True, null=True)
+    unlocked = models.BooleanField(default=False)
+    
     maximum_progress = models.FloatField(blank=True, null=True)
     paid_for_flag = models.BooleanField(default=False, blank=True, null=True)
-    favourited = models.BooleanField(default=False, blank=True, null=True)
+    favourited = models.BooleanField(default=False)
     data = models.JSONField(blank=True, null=True)
 
     def __str__(self):

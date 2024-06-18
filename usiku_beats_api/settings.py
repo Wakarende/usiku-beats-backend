@@ -51,23 +51,18 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
-        'rest_framework.throttling.ScopedRateThrottle',
-        'api.throttling.GlobalBurstRateThrottle',
-        'api.throttling.GlobalSustainedRateThrottle'
+        # 'rest_framework.throttling.AnonRateThrottle',
+        # 'rest_framework.throttling.UserRateThrottle',
+        # 'rest_framework.throttling.ScopedRateThrottle',
+        # 'api.throttling.GlobalBurstRateThrottle',
+        # 'api.throttling.GlobalSustainedRateThrottle'
 
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/day',
-        'user': '10000/day',
-        'burst': '100/min',
-        'sustained': '10000/day',
-        
-        # 'anon': '1000000000000010000000000000/day',
-        # 'user': '101000000000001000000000000000000/day',
-        # 'burst': '1010000000000001000000000000000/min',
-        # 'sustained': '100010000000100000000000000000000/day',
+        # 'anon': '100/day',
+        # 'user': '10000/day',
+        # 'burst': '100/min',
+        # 'sustained': '10000/day',
         
         
         # 'google-search': '1/day',
@@ -77,8 +72,8 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=60),
 }
 
 APPEND_SLASH = False
@@ -178,13 +173,13 @@ MEDIA_URL = '/media/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-# CORS_ALLOW_ALL_ORIGINS = True # If this is used then `CORS_ALLOWED_ORIGINS` will not have any effect
-# CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'https://usikubeats.com'
-] # If this is used, then not need to use `CORS_ALLOW_ALL_ORIGINS = True`
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    'http://localhost:3000',
-    'https://usikubeats.com'
-]
+CORS_ALLOW_ALL_ORIGINS = True # If this is used then `CORS_ALLOWED_ORIGINS` will not have any effect
+CORS_ALLOW_CREDENTIALS = True
+# CORS_ALLOWED_ORIGINS = [
+#     'http://localhost:3000',
+#     'https://usikubeats.com'
+# ] # If this is used, then not need to use `CORS_ALLOW_ALL_ORIGINS = True`
+# CORS_ALLOWED_ORIGIN_REGEXES = [
+#     'http://localhost:3000',
+#     'https://usikubeats.com'
+# ]
