@@ -6,6 +6,8 @@ urlpatterns = [
 	path('', views.apiOverview, name="api-overview"),
 	path('song-list/', views.songList, name="song-list"),
     path('initial-song-list/', views.get_initial_songs, name="get-initial-songs"),
+    path('songs/', views.get_songs_by_id, name="get-songs-by-id"),
+
 
     path('mdundo-song-list/', views.mdundoSongList, name="song-list"),
 	path('song-detail/<str:pk>/', views.songDetail, name="song-detail"),
@@ -18,6 +20,7 @@ urlpatterns = [
     
     path('signup/', views.signup, name='signup'),
     path('login/', views.login, name='login'),
+    path('version/', views.get_version, name='get_version'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     
         # Artist detail
@@ -33,6 +36,7 @@ urlpatterns = [
     path('player/songs/<int:pk>/', views.update_player_song_instance, name='update-player-song-instance'),
 
 
+    path('analytics/', views.log_analytics, name='log_analytics'),
 
     
 ]

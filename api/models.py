@@ -17,7 +17,7 @@ class Profile(models.Model):
 
 class Artist(models.Model):
     profile = models.OneToOneField(
-        Profile, default=None, on_delete=models.CASCADE, null=True)
+        Profile, default=None, on_delete=models.CASCADE, blank=True, null=True)
 
     name = models.CharField(max_length=100, null=True, blank=True)
     mpesa_number = models.IntegerField(null=True, blank=True)
@@ -82,6 +82,13 @@ class Tribe(models.Model):
 
 
 class Song(models.Model):
+
+    DIFFICULTY_CHOICES = (
+        ("easy", "Easy"),
+        ("medium", "Medium"),
+        ("hard", "Hard")
+    )
+
     artist = models.ForeignKey(
         Artist, on_delete=models.CASCADE, null=True, blank=True)
     genre = models.ForeignKey(
@@ -90,7 +97,8 @@ class Song(models.Model):
         Country, on_delete=models.CASCADE, null=True, blank=True)
     tribe = models.ForeignKey(
         Tribe, on_delete=models.CASCADE, null=True, blank=True)
-
+    
+    difficulty = models.CharField(max_length=10, choices=DIFFICULTY_CHOICES, default="medium")
     date_added = models.DateTimeField(auto_now_add=True)
 
     artist_name = models.CharField(max_length=100, blank=True, null=True)
