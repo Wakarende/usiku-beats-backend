@@ -272,9 +272,15 @@ def google_login(request):
 
         if user:
             # Link Google ID to existing account
-            profile = Profile.objects.get(user=user)
-            profile.google_id = google_id
-            profile.save()
+            profile = Profile.objects.filter(user=user).first()
+            if profile:
+                profile.google_id = google_id
+                profile.save()
+            else:
+                profile = Profile.objects.create(
+                    user=user, google_id=google_id, recent_ip_address=ip_address
+                )
+                Player.objects.create(profile=profile)
         else:
             # Create a new user
             username = generate_unique_username(email)
