@@ -27,7 +27,7 @@ SECRET_KEY = 'REMOVED_SECRET'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['15.188.53.189','localhost','ip-172-31-34-216.eu-west-3.compute.internal','api.usiku.games']
+ALLOWED_HOSTS = ['13.36.182.150','localhost','ip-172-31-34-216.eu-west-3.compute.internal','api.usiku.games']
 
 
 # Application definition
@@ -120,7 +120,7 @@ DATABASES = {
         'NAME': 'usiku_beats_database',
         'USER': 'cleve',
         'PASSWORD': 'REMOVED_SECRET',
-        'HOST': '15.188.53.189',
+        'HOST': '13.36.182.150',
         'PORT': '5432',
     }
 }
