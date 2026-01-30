@@ -13,6 +13,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from .scripts import *
 from django.contrib.auth import login as auth_login
 from django.utils import timezone
+import requests as http_requests
 
 @api_view(['GET'])
 def apiOverview(request):
@@ -226,6 +227,78 @@ def login(request):
         'data': data,
     })
 
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def google_login(request):
+    id_token = request.data.get('id_token')
+
+    if not id_token:
+        return Response({'error': 'id_token is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Verify the ID token with Google
+    try:
+        google_response = http_requests.get(
+            'https://oauth2.googleapis.com/tokeninfo',
+            params={'id_token': id_token}
+        )
+
+        if google_response.status_code != 200:
+            return Response({'error': 'Invalid Google token'}, status=status.HTTP_400_BAD_REQUEST)
+
+        google_data = google_response.json()
+    except Exception:
+        return Response({'error': 'Failed to verify Google token'}, status=status.HTTP_400_BAD_REQUEST)
+
+    google_id = google_data.get('sub')
+    email = google_data.get('email')
+    name = google_data.get('name', '')
+
+    if not google_id or not email:
+        return Response({'error': 'Invalid token data'}, status=status.HTTP_400_BAD_REQUEST)
+
+    ip_address = get_ip_address_from_request(request)
+
+    # Check if a profile with this google_id already exists
+    profile = Profile.objects.filter(google_id=google_id).first()
+
+    if profile:
+        # Existing Google user — log them in
+        user = profile.user
+    else:
+        # Check if a user with this email already exists (email/password account)
+        user = User.objects.filter(email=email).first()
+
+        if user:
+            # Link Google ID to existing account
+            profile = Profile.objects.get(user=user)
+            profile.google_id = google_id
+            profile.save()
+        else:
+            # Create a new user
+            username = generate_unique_username(email)
+            user = User.objects.create_user(
+                username=username, email=email, password=None
+            )
+            user.first_name = name
+            user.save()
+            profile = Profile.objects.create(
+                user=user, google_id=google_id, recent_ip_address=ip_address
+            )
+            Player.objects.create(profile=profile)
+
+    refresh = RefreshToken.for_user(user)
+
+    data = {}
+    data['profile'] = ProfileSerializer(profile).data
+
+    return Response({
+        'message': 'Google login successful',
+        'refresh': str(refresh),
+        'access': str(refresh.access_token),
+        'data': data,
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])

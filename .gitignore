@@ -1,4 +1,73 @@
-venv/*
-media/*
-static/*
+# Django
+*.pyc
+*.pyo
+*.pyd
 __pycache__/
+*.so
+.Python
+db.sqlite3
+db.sqlite3-journal
+
+# Environment variables
+.env
+*.env
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Media files
+media/
+
+# Static files (collected)
+staticfiles/
+static/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Redis
+dump.rdb
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Backup files
+*.bak
+*.backup
+
+# Coverage
+.coverage
+htmlcov/
+
+# pytest
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Candle data cache (offline backtesting)
+api/engine/candle_data/
+api/engine/bootstrap_data/
+
+# logs
+api/engine/logs/

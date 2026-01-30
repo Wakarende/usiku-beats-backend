@@ -9,6 +9,7 @@ class Profile(models.Model):
     phone_number = models.IntegerField(null=True, blank=True)
     receive_notifications = models.BooleanField(default=True)
     recent_ip_address = models.GenericIPAddressField(blank=True, null=True)
+    google_id = models.CharField(max_length=255, blank=True, null=True, unique=True)
 
     def __str__(self):
         return self.user.email
