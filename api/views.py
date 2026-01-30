@@ -232,16 +232,16 @@ def login(request):
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def google_login(request):
-    id_token = request.data.get('id_token')
+    access_token = request.data.get('access_token')
 
-    if not id_token:
-        return Response({'error': 'id_token is required'}, status=status.HTTP_400_BAD_REQUEST)
+    if not access_token:
+        return Response({'error': 'access_token is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Verify the ID token with Google
+    # Verify the access token by fetching user info from Google
     try:
         google_response = http_requests.get(
-            'https://oauth2.googleapis.com/tokeninfo',
-            params={'id_token': id_token}
+            'https://www.googleapis.com/oauth2/v3/userinfo',
+            headers={'Authorization': f'Bearer {access_token}'}
         )
 
         if google_response.status_code != 200:
