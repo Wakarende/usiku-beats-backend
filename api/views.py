@@ -185,7 +185,7 @@ def signup(request):
 
 
     data = {}
-    data['profile'] = ProfileSerializer(profile).data
+    data['profile'] = ProfileSerializer(profile, context={'request': request}).data
 
 
     return Response({
@@ -219,7 +219,7 @@ def login(request):
 
 
     data = {}
-    data['profile'] = ProfileSerializer(profile).data
+    data['profile'] = ProfileSerializer(profile, context={'request': request}).data
 
     return Response({
         'refresh': str(refresh),
@@ -297,7 +297,7 @@ def google_login(request):
     refresh = RefreshToken.for_user(user)
 
     data = {}
-    data['profile'] = ProfileSerializer(profile).data
+    data['profile'] = ProfileSerializer(profile, context={'request': request}).data
 
     return Response({
         'message': 'Google login successful',
@@ -378,7 +378,7 @@ def sync_player_data(request):
     # Return the full profile data (same as login response)
     profile = request.user.profile
     return Response({
-        'profile': ProfileSerializer(profile).data
+        'profile': ProfileSerializer(profile, context={'request': request}).data
     }, status=status.HTTP_200_OK)
     
 
@@ -389,7 +389,7 @@ def get_player_songs(request):
     player = get_object_or_404(Player, profile=request.user.profile)
     instances = PlayerSongInstance.objects.filter(player=player)
     
-    data = PlayerSongInstanceSerializer(instances, many=True).data
+    data = PlayerSongInstanceSerializer(instances, many=True, context={'request': request}).data
     return Response(data, status=status.HTTP_200_OK)
 
 
@@ -403,7 +403,7 @@ def update_player_song_instance(request, pk):
     if player_song_instance.player.profile.user != request.user:
         return Response({'error': 'You do not have permission to update this song instance.'}, status=status.HTTP_403_FORBIDDEN)
     
-    serializer = PlayerSongInstanceSerializer(player_song_instance, data=request.data, partial=True)
+    serializer = PlayerSongInstanceSerializer(player_song_instance, data=request.data, partial=True, context={'request': request})
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data)
