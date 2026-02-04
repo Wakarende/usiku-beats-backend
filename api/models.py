@@ -153,18 +153,21 @@ class Player(models.Model):
 class PlayerSongInstance(models.Model):
     song = models.ForeignKey(
         Song, on_delete=models.CASCADE, null=True, blank=True)
-    
+
     player = models.ForeignKey(
         Player, on_delete=models.CASCADE, null=True, blank=True, related_name='player_song_instances')
-    
-    date_added = models.DateTimeField(auto_now_add=True)
+
+    date_added = models.DateTimeField(blank=True, null=True)
     # date_last_played = models.DateTimeField(auto_now=True)
     high_score = models.BigIntegerField(default=0)
-    
+
     no_of_plays = models.BigIntegerField(default=0)
     unlock_time = models.DateTimeField(blank=True, null=True)
     unlocked = models.BooleanField(default=False)
-    
+    unlock_start_time = models.DateTimeField(blank=True, null=True)
+    unlock_duration_sec = models.FloatField(blank=True, null=True)
+    unlock_completed_at = models.DateTimeField(blank=True, null=True)
+
     maximum_progress = models.FloatField(blank=True, null=True)
     paid_for_flag = models.BooleanField(default=False, blank=True, null=True)
     favourited = models.BooleanField(default=False)

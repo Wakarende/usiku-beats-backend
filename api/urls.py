@@ -28,11 +28,8 @@ urlpatterns = [
     path('artist-detail/<int:pk>/', views.artist_detail, name='artist-detail'),
 
     
-    path('player/gems/', views.update_gems, name="update-gems"),
-    path('player/stars/', views.update_stars, name="update-stars"),
-    path('player/discs/', views.update_discs, name="update-discs"),
-    path('player/level/', views.update_level, name="update-level"),
-    
+    path('player/sync/', views.sync_player_data, name="sync-player-data"),
+
     path('player/songs/', views.get_player_songs, name="get-player-songs"),
     path('player/songs/<int:pk>/', views.update_player_song_instance, name='update-player-song-instance'),
 

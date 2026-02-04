@@ -309,82 +309,77 @@ def google_login(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
-def update_discs(request):
-    
-    player = get_object_or_404(Player, profile=request.user.profile)
-    try:
-        resource_to_add = float(request.data.get('discs', 0))
-                
-        new_total_resource = player.total_discs + resource_to_add
-        if new_total_resource < 0:
-            return Response({'error': 'Resource count cannot be less than 0'}, status=status.HTTP_400_BAD_REQUEST)
-
-        player.total_discs = new_total_resource
-        player.save()
-        serializer = PlayerSerializer(player)
-        return Response(serializer.data)
-    except Player.DoesNotExist:
-        return Response({'error': 'Player not found'}, status=status.HTTP_404_NOT_FOUND)
-
-
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def update_stars(request):
-    
-    player = get_object_or_404(Player, profile=request.user.profile)
-    try:
-        resource_to_add = float(request.data.get('stars', 0))
-                
-        new_total_resource = player.total_stars + resource_to_add
-        if new_total_resource < 0:
-            return Response({'error': 'Resource count cannot be less than 0'}, status=status.HTTP_400_BAD_REQUEST)
-
-        player.total_stars = new_total_resource
-        player.save()
-        serializer = PlayerSerializer(player)
-        return Response(serializer.data)
-    except Player.DoesNotExist:
-        return Response({'error': 'Player not found'}, status=status.HTTP_404_NOT_FOUND)
-    
-    
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def update_gems(request):
-    
-    player = get_object_or_404(Player, profile=request.user.profile)
-    try:
-        resource_to_add = float(request.data.get('gems', 0))
-                
-        new_total_resource = player.total_gems + resource_to_add
-        if new_total_resource < 0:
-            return Response({'error': 'Resource count cannot be less than 0'}, status=status.HTTP_400_BAD_REQUEST)
-
-        player.total_gems = new_total_resource
-        player.save()
-        serializer = PlayerSerializer(player)
-        return Response(serializer.data)
-    except Player.DoesNotExist:
-        return Response({'error': 'Player not found'}, status=status.HTTP_404_NOT_FOUND)
-    
-    
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def update_level(request):
+def sync_player_data(request):
+    from .serializers import PlayerSyncSerializer
 
     player = get_object_or_404(Player, profile=request.user.profile)
-    try:
-        resource_to_add = float(request.data.get('level', 1))
-                
-        new_total_resource = player.level + resource_to_add
-        if new_total_resource < 1:
-            return Response({'error': 'Resource count cannot be less than 1'}, status=status.HTTP_400_BAD_REQUEST)
+    serializer = PlayerSyncSerializer(data=request.data)
 
-        player.level = new_total_resource
-        player.save()
-        serializer = PlayerSerializer(player)
-        return Response(serializer.data)
-    except Player.DoesNotExist:
-        return Response({'error': 'Player not found'}, status=status.HTTP_404_NOT_FOUND)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    data = serializer.validated_data
+
+    # Update player fields if provided
+    player_data = data.get('player', {})
+    if 'level' in player_data:
+        player.level = player_data['level']
+    if 'total_discs' in player_data:
+        player.total_discs = player_data['total_discs']
+    if 'total_gems' in player_data:
+        player.total_gems = player_data['total_gems']
+    if 'total_stars' in player_data:
+        player.total_stars = player_data['total_stars']
+    player.save()
+
+    # Upsert player song instances
+    song_instances_data = data.get('player_song_instances', [])
+    for instance_data in song_instances_data:
+        song_id = instance_data.pop('song_id')
+        song = Song.objects.filter(id=song_id).first()
+        if not song:
+            continue
+
+        # Get or create the PlayerSongInstance
+        psi, created = PlayerSongInstance.objects.get_or_create(
+            player=player,
+            song=song,
+            defaults={
+                'date_added': instance_data.get('date_added') or timezone.now(),
+            }
+        )
+
+        # Update all provided fields
+        if 'high_score' in instance_data:
+            psi.high_score = instance_data['high_score']
+        if 'no_of_plays' in instance_data:
+            psi.no_of_plays = instance_data['no_of_plays']
+        if 'favourited' in instance_data:
+            psi.favourited = instance_data['favourited']
+        if 'unlocked' in instance_data:
+            psi.unlocked = instance_data['unlocked']
+        if 'unlock_time' in instance_data:
+            psi.unlock_time = instance_data['unlock_time']
+        if 'unlock_start_time' in instance_data:
+            psi.unlock_start_time = instance_data['unlock_start_time']
+        if 'unlock_duration_sec' in instance_data:
+            psi.unlock_duration_sec = instance_data['unlock_duration_sec']
+        if 'unlock_completed_at' in instance_data:
+            psi.unlock_completed_at = instance_data['unlock_completed_at']
+        if 'maximum_progress' in instance_data:
+            psi.maximum_progress = instance_data['maximum_progress']
+        if 'paid_for_flag' in instance_data:
+            psi.paid_for_flag = instance_data['paid_for_flag']
+        if 'date_added' in instance_data and instance_data['date_added']:
+            psi.date_added = instance_data['date_added']
+
+        psi.save()
+
+    # Return the full profile data (same as login response)
+    profile = request.user.profile
+    return Response({
+        'profile': ProfileSerializer(profile).data
+    }, status=status.HTTP_200_OK)
     
 
 @api_view(['GET'])
@@ -484,118 +479,6 @@ def get_version(request):
     
     return Response(version_data, status=status.HTTP_200_OK)
 
-
-# @api_view(['POST'])
-# @permission_classes([permissions.AllowAny])
-# def log_analytics(request):
-#     import csv
-#     import os
-#     from datetime import datetime
-#     from django.conf import settings
-    
-#     # Get parameters from POST request
-#     session_id = request.data.get('sessionId', '')
-#     event_id = request.data.get('eventId', '')
-    
-#     # Generate timestamp
-#     timestamp = datetime.now().isoformat()
-    
-#     # Create analytics directory in media root or use a temp directory
-#     try:
-#         # Option 1: Use Django's MEDIA_ROOT (recommended)
-#         if hasattr(settings, 'MEDIA_ROOT') and settings.MEDIA_ROOT:
-#             analytics_dir = os.path.join(settings.MEDIA_ROOT, 'analytics')
-#         else:
-#             # Option 2: Use system temp directory as fallback
-#             import tempfile
-#             analytics_dir = os.path.join(tempfile.gettempdir(), 'django_analytics')
-        
-#         # Create directory if it doesn't exist
-#         os.makedirs(analytics_dir, exist_ok=True)
-        
-#         # Path to analytics CSV file
-#         csv_file_path = os.path.join(analytics_dir, 'analytics.csv')
-        
-#     except Exception as e:
-#         return Response({
-#             'error': 'Failed to create analytics directory',
-#             'details': str(e)
-#         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-#     # Check if file exists to determine if we need to write headers
-#     file_exists = os.path.isfile(csv_file_path)
-    
-#     try:
-#         # Open file in append mode
-#         with open(csv_file_path, 'a', newline='', encoding='utf-8') as csvfile:
-#             fieldnames = ['Timestamp', 'sessionId', 'eventId']
-#             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            
-#             # Write header if file is new
-#             if not file_exists:
-#                 writer.writeheader()
-            
-#             # Write the data row
-#             writer.writerow({
-#                 'Timestamp': timestamp,
-#                 'sessionId': session_id,
-#                 'eventId': event_id
-#             })
-        
-#         return Response({
-#             'message': 'Analytics data logged successfully',
-#             'timestamp': timestamp,
-#             'file_path': csv_file_path  # For debugging - remove in production
-#         }, status=status.HTTP_200_OK)
-        
-#     except Exception as e:
-#         return Response({
-#             'error': 'Failed to log analytics data',
-#             'details': str(e)
-#         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    
-#     # Get parameters from POST request
-#     session_id = request.data.get('sessionId', '')
-#     event_id = request.data.get('eventId', '')
-    
-#     # Generate timestamp
-#     timestamp = datetime.now().isoformat()
-    
-#     # Path to analytics CSV file
-#     csv_file_path = 'analytics.csv'
-    
-#     # Check if file exists to determine if we need to write headers
-#     file_exists = os.path.isfile(csv_file_path)
-    
-#     try:
-#         # Open file in append mode
-#         with open(csv_file_path, 'a', newline='', encoding='utf-8') as csvfile:
-#             fieldnames = ['Timestamp', 'sessionId', 'eventId']
-#             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            
-#             # Write header if file is new
-#             if not file_exists:
-#                 writer.writeheader()
-            
-#             # Write the data row
-#             writer.writerow({
-#                 'Timestamp': timestamp,
-#                 'sessionId': session_id,
-#                 'eventId': event_id
-#             })
-        
-#         return Response({
-#             'message': 'Analytics data logged successfully',
-#             'timestamp': timestamp
-#         }, status=status.HTTP_200_OK)
-        
-#     except Exception as e:
-#         return Response({
-#             'error': 'Failed to log analytics data',
-#             'details': str(e)
-#         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
