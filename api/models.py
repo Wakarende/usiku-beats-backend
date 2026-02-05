@@ -209,6 +209,24 @@ class SongInstance(models.Model):
         pass
 
 
+class WebhookLog(models.Model):
+    """Store all incoming webhook data for tracking purposes"""
+
+    source = models.CharField(max_length=50)  # e.g., 'xsolla', 'stripe', etc.
+    notification_type = models.CharField(max_length=100, blank=True, null=True)
+    payload = models.JSONField()
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    headers = models.JSONField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.source} - {self.notification_type} - {self.created_at}'
+
+    class Meta:
+        verbose_name_plural = 'Webhook Logs'
+        ordering = ['-created_at']
+
+
 class XsollaTransaction(models.Model):
     """Track Xsolla webhook transactions for idempotency and auditing"""
 

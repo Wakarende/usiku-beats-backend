@@ -11,6 +11,8 @@ admin.site.register(Song)
 admin.site.register(SongInstance)
 admin.site.register(PlayerSongInstance)
 admin.site.register(Tribe)
+admin.site.register(WebhookLog)
+admin.site.register(XsollaTransaction)
 
 
 
