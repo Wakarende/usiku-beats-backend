@@ -554,24 +554,23 @@ def xsolla_webhook(request):
     Handle Xsolla payment webhooks.
     Supports: order_paid, order_canceled
     """
-    data = request.data
-    notification_type = data.get('notification_type')
-
-    # Log all incoming webhooks for tracking
-    WebhookLog.objects.create(
-        source='xsolla',
-        notification_type=notification_type,
-        payload=data,
-        ip_address=get_ip_address_from_request(request),
-        headers=dict(request.headers),
-    )
-
-    # Verify signature
+    # Verify signature first (before accessing request.data)
     is_valid, error_message = verify_xsolla_signature(request)
     if not is_valid:
         return Response({'error': error_message}, status=status.HTTP_401_UNAUTHORIZED)
 
     try:
+        data = request.data
+        notification_type = data.get('notification_type')
+
+        # Log all incoming webhooks for tracking
+        WebhookLog.objects.create(
+            source='xsolla',
+            notification_type=notification_type,
+            payload=data,
+            ip_address=get_ip_address_from_request(request),
+            headers=dict(request.headers),
+        )
 
         # Handle order_paid
         if notification_type == 'order_paid':
