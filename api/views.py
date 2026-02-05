@@ -14,6 +14,9 @@ from .scripts import *
 from django.contrib.auth import login as auth_login
 from django.utils import timezone
 import requests as http_requests
+from decimal import Decimal
+from .utils import verify_xsolla_signature
+from .constants import XSOLLA_SKU_REWARDS
 
 @api_view(['GET'])
 def apiOverview(request):
@@ -542,3 +545,146 @@ def log_analytics(request):
             'error': 'Failed to log analytics data',
             'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def xsolla_webhook(request):
+    """
+    Handle Xsolla payment webhooks.
+    Supports: order_paid, order_canceled
+    """
+    # Verify signature
+    is_valid, error_message = verify_xsolla_signature(request)
+    if not is_valid:
+        return Response({'error': error_message}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        data = request.data
+        notification_type = data.get('notification_type')
+
+        # Handle order_paid
+        if notification_type == 'order_paid':
+            order = data.get('order', {})
+            user_data = data.get('user', {})
+            items = data.get('items', [])
+            billing = data.get('billing', {})
+
+            order_id = order.get('id')
+            user_external_id = user_data.get('external_id')  # User's email
+
+            # Check for duplicate (idempotency)
+            existing_transaction = XsollaTransaction.objects.filter(order_id=order_id).first()
+            if existing_transaction and existing_transaction.status == 'paid':
+                return Response({'status': 'ok', 'message': 'Order already processed'})
+
+            # Find the player by email
+            user = User.objects.filter(email=user_external_id).first()
+            if not user:
+                return Response({'error': 'User not found'}, status=status.HTTP_400_BAD_REQUEST)
+
+            profile = Profile.objects.filter(user=user).first()
+            if not profile:
+                return Response({'error': 'Profile not found'}, status=status.HTTP_400_BAD_REQUEST)
+
+            player = Player.objects.filter(profile=profile).first()
+            if not player:
+                return Response({'error': 'Player not found'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Calculate total rewards from all items
+            total_discs = 0
+            total_gems = 0
+
+            for item in items:
+                sku = item.get('sku')
+                quantity = item.get('quantity', 1)
+                rewards = XSOLLA_SKU_REWARDS.get(sku, {})
+                total_discs += rewards.get('discs', 0) * quantity
+                total_gems += rewards.get('gems', 0) * quantity
+
+            # Grant the rewards
+            player.total_discs += total_discs
+            player.total_gems += total_gems
+            player.save()
+
+            # Record the transaction
+            transaction = billing.get('transaction', {})
+            XsollaTransaction.objects.create(
+                order_id=order_id,
+                invoice_id=order.get('invoice_id'),
+                transaction_id=transaction.get('id'),
+                player=player,
+                user_external_id=user_external_id,
+                status='paid',
+                notification_type='order_paid',
+                currency=order.get('currency', 'USD'),
+                amount=Decimal(order.get('amount', '0')),
+                discs_granted=total_discs,
+                gems_granted=total_gems,
+                webhook_payload=data,
+                is_sandbox=(order.get('mode') == 'sandbox'),
+            )
+
+            return Response({
+                'status': 'ok',
+                'discs_granted': total_discs,
+                'gems_granted': total_gems,
+            })
+
+        # Handle order_canceled
+        elif notification_type == 'order_canceled':
+            order = data.get('order', {})
+            user_data = data.get('user', {})
+
+            order_id = order.get('id')
+            user_external_id = user_data.get('external_id')
+
+            # Find the original paid transaction
+            original_transaction = XsollaTransaction.objects.filter(
+                order_id=order_id,
+                status='paid'
+            ).first()
+
+            if not original_transaction:
+                return Response({'status': 'ok', 'message': 'No paid transaction found to cancel'})
+
+            # Check if already canceled
+            if XsollaTransaction.objects.filter(order_id=order_id, status='canceled').exists():
+                return Response({'status': 'ok', 'message': 'Order already canceled'})
+
+            player = original_transaction.player
+            if player:
+                # Revoke the rewards (don't go negative)
+                player.total_discs = max(0, player.total_discs - original_transaction.discs_granted)
+                player.total_gems = max(0, player.total_gems - original_transaction.gems_granted)
+                player.save()
+
+            # Record the cancellation
+            XsollaTransaction.objects.create(
+                order_id=order_id,
+                invoice_id=order.get('invoice_id'),
+                transaction_id=original_transaction.transaction_id,
+                player=player,
+                user_external_id=user_external_id,
+                status='canceled',
+                notification_type='order_canceled',
+                currency=order.get('currency', 'USD'),
+                amount=Decimal(order.get('amount', '0')),
+                discs_granted=-original_transaction.discs_granted,
+                gems_granted=-original_transaction.gems_granted,
+                webhook_payload=data,
+                is_sandbox=(order.get('mode') == 'sandbox'),
+            )
+
+            return Response({
+                'status': 'ok',
+                'discs_revoked': original_transaction.discs_granted,
+                'gems_revoked': original_transaction.gems_granted,
+            })
+
+        else:
+            # Return success for unhandled notification types
+            return Response({'status': 'ok', 'message': f'Notification type {notification_type} acknowledged'})
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

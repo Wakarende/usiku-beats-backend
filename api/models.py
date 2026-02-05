@@ -192,7 +192,7 @@ class SongInstance(models.Model):
         Song, on_delete=models.CASCADE, null=True, blank=True)
     player = models.ForeignKey(
         Player, on_delete=models.CASCADE, null=True, blank=True)
-    
+
     date = models.DateTimeField(auto_now_add=True)
     score = models.IntegerField(blank=True, null=True)
     progress = models.FloatField(blank=True, null=True)
@@ -200,10 +200,51 @@ class SongInstance(models.Model):
 
     def __str__(self):
         return f'{self.player_song} - {self.date}'
-    
+
     class Meta:
         verbose_name_plural = 'Song Instances'
 
     def percentage_plays(self, percentage):
         # get % OF PLAYS THAT ENDED IN < 10% OF TRACK
         pass
+
+
+class XsollaTransaction(models.Model):
+    """Track Xsolla webhook transactions for idempotency and auditing"""
+
+    STATUS_CHOICES = (
+        ('paid', 'Paid'),
+        ('canceled', 'Canceled'),
+    )
+
+    order_id = models.IntegerField(unique=True)
+    invoice_id = models.CharField(max_length=100, blank=True, null=True)
+    transaction_id = models.IntegerField(blank=True, null=True)
+
+    player = models.ForeignKey(
+        Player, on_delete=models.SET_NULL, null=True, blank=True, related_name='xsolla_transactions')
+    user_external_id = models.CharField(max_length=255)  # User email from Xsolla
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
+    notification_type = models.CharField(max_length=50)
+
+    currency = models.CharField(max_length=10)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    # Track what was granted
+    discs_granted = models.IntegerField(default=0)
+    gems_granted = models.IntegerField(default=0)
+
+    # Store the full webhook payload for reference
+    webhook_payload = models.JSONField()
+
+    is_sandbox = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'Order {self.order_id} - {self.status} - {self.user_external_id}'
+
+    class Meta:
+        verbose_name_plural = 'Xsolla Transactions'
+        ordering = ['-created_at']
