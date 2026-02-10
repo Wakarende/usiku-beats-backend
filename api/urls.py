@@ -36,6 +36,7 @@ urlpatterns = [
 
     path('analytics/', views.log_analytics, name='log_analytics'),
 
-    # Xsolla webhooks
+    # Xsolla
     path('webhooks/xsolla/', views.xsolla_webhook, name='xsolla-webhook'),
+    path('payment/create-token/', views.create_xsolla_payment_token, name='create-xsolla-payment-token'),
 ]

@@ -16,7 +16,13 @@ from django.utils import timezone
 import requests as http_requests
 from decimal import Decimal
 from .utils import verify_xsolla_signature
-from .constants import XSOLLA_SKU_REWARDS
+from .constants import (
+    XSOLLA_SKU_REWARDS,
+    XSOLLA_PROJECT_ID,
+    XSOLLA_MERCHANT_ID,
+    XSOLLA_API_KEY,
+)
+import base64
 
 @api_view(['GET'])
 def apiOverview(request):
@@ -694,6 +700,72 @@ def xsolla_webhook(request):
         else:
             # Return success for unhandled notification types
             return Response({'status': 'ok', 'message': f'Notification type {notification_type} acknowledged'})
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def create_xsolla_payment_token(request):
+    """
+    Create a payment token for Xsolla checkout.
+    Uses the authenticated user's email as external_id.
+    """
+    sku = request.data.get('sku')
+    return_url = request.data.get('return_url', '')
+    sandbox = request.data.get('sandbox', False)
+
+    if not sku:
+        return Response({'error': 'sku is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user_email = request.user.email
+
+    # Create Basic auth header
+    auth_string = f"{XSOLLA_MERCHANT_ID}:{XSOLLA_API_KEY}"
+    auth_encoded = base64.b64encode(auth_string.encode()).decode()
+
+    try:
+        response = http_requests.post(
+            f"https://store.xsolla.com/api/v3/project/{XSOLLA_PROJECT_ID}/admin/payment/token",
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': f'Basic {auth_encoded}'
+            },
+            json={
+                'user': {
+                    'id': {'value': user_email},
+                    'email': {'value': user_email}
+                },
+                'purchase': {
+                    'items': [{'sku': sku, 'quantity': 1}]
+                },
+                'sandbox': sandbox,
+                'settings': {
+                    'return_url': return_url
+                }
+            }
+        )
+
+        if response.status_code != 200:
+            return Response(
+                {'error': 'Failed to create payment token', 'details': response.text},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        data = response.json()
+
+        # Return token and payment URL
+        payment_url = (
+            f"https://sandbox-secure.xsolla.com/paystation4/?token={data['token']}"
+            if sandbox
+            else f"https://secure.xsolla.com/paystation4/?token={data['token']}"
+        )
+
+        return Response({
+            'token': data['token'],
+            'payment_url': payment_url
+        })
 
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
