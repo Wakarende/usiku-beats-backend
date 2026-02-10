@@ -749,7 +749,7 @@ def create_xsolla_payment_token(request):
             }
         )
 
-        if response.status_code != 200:
+        if not response.ok:
             return Response(
                 {'error': 'Failed to create payment token', 'details': response.text},
                 status=status.HTTP_400_BAD_REQUEST
