@@ -29,6 +29,7 @@ urlpatterns = [
 
     
     path('player/sync/', views.sync_player_data, name="sync-player-data"),
+    path('player/profile/', views.get_player_profile, name="get-player-profile"),
 
     path('player/songs/', views.get_player_songs, name="get-player-songs"),
     path('player/songs/<int:pk>/', views.update_player_song_instance, name='update-player-song-instance'),

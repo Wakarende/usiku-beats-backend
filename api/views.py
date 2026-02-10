@@ -393,6 +393,16 @@ def sync_player_data(request):
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
+def get_player_profile(request):
+    """Read-only endpoint to fetch current player profile without pushing any data."""
+    profile = request.user.profile
+    return Response({
+        'profile': ProfileSerializer(profile, context={'request': request}).data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
 def get_player_songs(request):
 
     player = get_object_or_404(Player, profile=request.user.profile)
@@ -618,14 +628,10 @@ def xsolla_webhook(request):
                 total_gems += rewards.get('gems', 0) * quantity
 
             # Grant the rewards
-            print(f"BEFORE: player.id={player.id}, discs={player.total_discs}, gems={player.total_gems}")
-            print(f"ADDING: total_discs={total_discs}, total_gems={total_gems}")
             player.total_discs += total_discs
             player.total_gems += total_gems
-            print(f"AFTER ADD: discs={player.total_discs}, gems={player.total_gems}")
             player.save()
             player.refresh_from_db()
-            print(f"AFTER SAVE: discs={player.total_discs}, gems={player.total_gems}")
 
             # Record the transaction
             transaction = billing.get('transaction', {})
