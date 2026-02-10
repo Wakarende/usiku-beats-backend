@@ -618,9 +618,14 @@ def xsolla_webhook(request):
                 total_gems += rewards.get('gems', 0) * quantity
 
             # Grant the rewards
+            print(f"BEFORE: player.id={player.id}, discs={player.total_discs}, gems={player.total_gems}")
+            print(f"ADDING: total_discs={total_discs}, total_gems={total_gems}")
             player.total_discs += total_discs
             player.total_gems += total_gems
+            print(f"AFTER ADD: discs={player.total_discs}, gems={player.total_gems}")
             player.save()
+            player.refresh_from_db()
+            print(f"AFTER SAVE: discs={player.total_discs}, gems={player.total_gems}")
 
             # Record the transaction
             transaction = billing.get('transaction', {})
