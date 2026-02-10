@@ -720,6 +720,7 @@ def create_xsolla_payment_token(request):
         return Response({'error': 'sku is required'}, status=status.HTTP_400_BAD_REQUEST)
 
     user_email = request.user.email
+    user_ip = get_ip_address_from_request(request)
 
     # Create Basic auth header
     auth_string = f"{XSOLLA_MERCHANT_ID}:{XSOLLA_API_KEY}"
@@ -730,7 +731,8 @@ def create_xsolla_payment_token(request):
             f"https://store.xsolla.com/api/v3/project/{XSOLLA_PROJECT_ID}/admin/payment/token",
             headers={
                 'Content-Type': 'application/json',
-                'Authorization': f'Basic {auth_encoded}'
+                'Authorization': f'Basic {auth_encoded}',
+                'X-User-Ip': user_ip or '127.0.0.1'
             },
             json={
                 'user': {
