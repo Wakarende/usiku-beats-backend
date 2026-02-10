@@ -646,56 +646,56 @@ def xsolla_webhook(request):
                 'gems_granted': total_gems,
             })
 
-        # Handle order_canceled
-        elif notification_type == 'order_canceled':
-            order = data.get('order', {})
-            user_data = data.get('user', {})
+        # # Handle order_canceled
+        # elif notification_type == 'order_canceled':
+        #     order = data.get('order', {})
+        #     user_data = data.get('user', {})
 
-            order_id = order.get('id')
-            user_external_id = user_data.get('external_id')
+        #     order_id = order.get('id')
+        #     user_external_id = user_data.get('external_id')
 
-            # Find the original paid transaction
-            original_transaction = XsollaTransaction.objects.filter(
-                order_id=order_id,
-                status='paid'
-            ).first()
+        #     # Find the original paid transaction
+        #     original_transaction = XsollaTransaction.objects.filter(
+        #         order_id=order_id,
+        #         status='paid'
+        #     ).first()
 
-            if not original_transaction:
-                return Response({'status': 'ok', 'message': 'No paid transaction found to cancel'})
+        #     if not original_transaction:
+        #         return Response({'status': 'ok', 'message': 'No paid transaction found to cancel'})
 
-            # Check if already canceled
-            if XsollaTransaction.objects.filter(order_id=order_id, status='canceled').exists():
-                return Response({'status': 'ok', 'message': 'Order already canceled'})
+        #     # Check if already canceled
+        #     if XsollaTransaction.objects.filter(order_id=order_id, status='canceled').exists():
+        #         return Response({'status': 'ok', 'message': 'Order already canceled'})
 
-            player = original_transaction.player
-            if player:
-                # Revoke the rewards (don't go negative)
-                player.total_discs = max(0, player.total_discs - original_transaction.discs_granted)
-                player.total_gems = max(0, player.total_gems - original_transaction.gems_granted)
-                player.save()
+        #     player = original_transaction.player
+        #     if player:
+        #         # Revoke the rewards (don't go negative)
+        #         player.total_discs = max(0, player.total_discs - original_transaction.discs_granted)
+        #         player.total_gems = max(0, player.total_gems - original_transaction.gems_granted)
+        #         player.save()
 
-            # Record the cancellation
-            XsollaTransaction.objects.create(
-                order_id=order_id,
-                invoice_id=order.get('invoice_id'),
-                transaction_id=original_transaction.transaction_id,
-                player=player,
-                user_external_id=user_external_id,
-                status='canceled',
-                notification_type='order_canceled',
-                currency=order.get('currency', 'USD'),
-                amount=Decimal(order.get('amount', '0')),
-                discs_granted=-original_transaction.discs_granted,
-                gems_granted=-original_transaction.gems_granted,
-                webhook_payload=data,
-                is_sandbox=(order.get('mode') == 'sandbox'),
-            )
+        #     # Record the cancellation
+        #     XsollaTransaction.objects.create(
+        #         order_id=order_id,
+        #         invoice_id=order.get('invoice_id'),
+        #         transaction_id=original_transaction.transaction_id,
+        #         player=player,
+        #         user_external_id=user_external_id,
+        #         status='canceled',
+        #         notification_type='order_canceled',
+        #         currency=order.get('currency', 'USD'),
+        #         amount=Decimal(order.get('amount', '0')),
+        #         discs_granted=-original_transaction.discs_granted,
+        #         gems_granted=-original_transaction.gems_granted,
+        #         webhook_payload=data,
+        #         is_sandbox=(order.get('mode') == 'sandbox'),
+        #     )
 
-            return Response({
-                'status': 'ok',
-                'discs_revoked': original_transaction.discs_granted,
-                'gems_revoked': original_transaction.gems_granted,
-            })
+        #     return Response({
+        #         'status': 'ok',
+        #         'discs_revoked': original_transaction.discs_granted,
+        #         'gems_revoked': original_transaction.gems_granted,
+        #     })
 
         else:
             # Return success for unhandled notification types
