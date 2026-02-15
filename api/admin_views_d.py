@@ -29,7 +29,7 @@ from .admin_utils import get_admin_user, log_audit
 def revenue_payee_list(request):
     """
     GET /admin/revenue/payees/
-    List artists as payees with their revenue and balance info.
+    List labels as payees. Returns flat array matching AdminPayee[] type.
     """
     admin = get_admin_user(request)
     if not admin:
@@ -38,43 +38,27 @@ def revenue_payee_list(request):
     if admin.role not in ('super_user', 'product_manager'):
         return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
 
-    artists = Artist.objects.select_related('label').annotate(
-        song_count=Count('song'),
-        payout_count=Count('payout'),
-    ).order_by('-revenue_earned')
+    from .models import Label, Song, PlayerSongInstance
+    from django.db.models import Sum as DSum
 
-    # Search
-    search = request.GET.get('search', '').strip()
-    if search:
-        artists = artists.filter(name__icontains=search)
-
-    # Pagination
-    page = max(int(request.GET.get('page', 1)), 1)
-    page_size = min(int(request.GET.get('page_size', 20)), 100)
-    total = artists.count()
-    start = (page - 1) * page_size
-    end = start + page_size
-    artists_page = artists[start:end]
-
+    labels = Label.objects.all().order_by('name')
     results = []
-    for artist in artists_page:
+    for label in labels:
+        artist_ids = list(Artist.objects.filter(label=label).values_list('id', flat=True))
+        artist_count = len(artist_ids)
+        song_ids = list(Song.objects.filter(artist_id__in=artist_ids).values_list('id', flat=True))
+        total_plays = PlayerSongInstance.objects.filter(song_id__in=song_ids).aggregate(
+            tp=DSum('no_of_plays')
+        )['tp'] or 0
+
         results.append({
-            'id': artist.id,
-            'name': artist.name,
-            'label': artist.label.name if artist.label else None,
-            'song_count': artist.song_count,
-            'revenue_earned': artist.revenue_earned or 0,
-            'current_balance': artist.current_balance or 0,
-            'payout_count': artist.payout_count,
-            'preferred_payout_method': artist.preferred_payout_method,
+            'id': label.id,
+            'name': label.name,
+            'artist_count': artist_count,
+            'total_plays': total_plays,
         })
 
-    return Response({
-        'results': results,
-        'total': total,
-        'page': page,
-        'page_size': page_size,
-    })
+    return Response(results)
 
 
 @api_view(['GET'])
@@ -83,7 +67,8 @@ def revenue_payee_list(request):
 def revenue_payee_detail(request, pk):
     """
     GET /admin/revenue/payees/<pk>/
-    Payee detail with full payout history and payment statuses.
+    Label (payee) detail with artists, payouts, and payment records.
+    Returns shape matching AdminPayeeDetail frontend type.
     """
     admin = get_admin_user(request)
     if not admin:
@@ -92,45 +77,70 @@ def revenue_payee_detail(request, pk):
     if admin.role not in ('super_user', 'product_manager'):
         return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
 
-    artist = get_object_or_404(Artist.objects.select_related('label'), pk=pk)
+    from .models import Label, Song, PlayerSongInstance
+    label = get_object_or_404(Label, pk=pk)
 
-    # Payout history
-    payouts = Payout.objects.filter(artist=artist).order_by('-date')
+    # Artists under this label
+    artists = Artist.objects.filter(label=label).order_by('name')
+    artists_data = []
+    for a in artists:
+        artist_song_ids = list(Song.objects.filter(artist=a).values_list('id', flat=True))
+        song_count = len(artist_song_ids)
+        total_plays = PlayerSongInstance.objects.filter(song_id__in=artist_song_ids).aggregate(
+            tp=Sum('no_of_plays')
+        )['tp'] or 0
+        artists_data.append({
+            'id': a.id,
+            'name': a.name,
+            'song_count': song_count,
+            'total_plays': total_plays,
+        })
+
+    # Payouts for artists in this label
+    artist_ids = [a.id for a in artists]
+    payouts = Payout.objects.filter(artist_id__in=artist_ids).order_by('-date')
     payouts_data = []
     for p in payouts:
         payouts_data.append({
             'id': p.id,
-            'date': p.date.isoformat(),
-            'method': p.method,
-            'receipt_url': p.receipt_url,
+            'amount': str(0),
+            'period_start': p.date.strftime('%Y-%m-%d'),
+            'period_end': p.date.strftime('%Y-%m-%d'),
+            'status': 'completed',
+            'created_at': p.date.isoformat(),
         })
 
-    # Payment statuses
-    payment_statuses = PaymentStatus.objects.filter(artist=artist).order_by('-created_at')
+    # Payment records for this label
+    payment_records = PaymentStatus.objects.filter(
+        payee_type='label', payee_id=label.id
+    ).order_by('-period_year', '-period_month')
     payments_data = []
-    for ps in payment_statuses:
+    for ps in payment_records:
         payments_data.append({
             'id': ps.id,
-            'period_start': ps.period_start.isoformat(),
-            'period_end': ps.period_end.isoformat(),
-            'amount': str(ps.amount),
-            'currency': ps.currency,
+            'payee_name': label.name,
+            'amount': str(ps.payment_amount or 0),
+            'currency': 'USD',
             'status': ps.status,
-            'initiated_by': ps.initiated_by,
+            'payment_method': ps.payment_method,
+            'reference': None,
+            'period_start': f'{ps.period_year}-{ps.period_month:02d}-01' if ps.period_year else None,
+            'period_end': f'{ps.period_year}-{ps.period_month:02d}-28' if ps.period_year else None,
             'notes': ps.notes,
             'created_at': ps.created_at.isoformat(),
+            'updated_at': ps.updated_at.isoformat(),
         })
 
     data = {
-        'id': artist.id,
-        'name': artist.name,
-        'label': artist.label.name if artist.label else None,
-        'revenue_earned': artist.revenue_earned or 0,
-        'current_balance': artist.current_balance or 0,
-        'preferred_payout_method': artist.preferred_payout_method,
-        'mpesa_number': artist.mpesa_number,
+        'label': {
+            'id': label.id,
+            'name': label.name,
+            'is_system': label.is_system,
+            'artist_count': len(artists_data),
+        },
+        'artists': artists_data,
         'payouts': payouts_data,
-        'payment_statuses': payments_data,
+        'payments': payments_data,
     }
 
     return Response(data)
@@ -151,16 +161,20 @@ def payment_status_list(request):
     if admin.role not in ('super_user', 'product_manager'):
         return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
 
-    payments = PaymentStatus.objects.select_related('artist').all()
+    payments = PaymentStatus.objects.all()
 
     # Filters
     status_filter = request.GET.get('status', '').strip()
     if status_filter:
         payments = payments.filter(status=status_filter)
 
-    artist_id = request.GET.get('artist_id', '').strip()
-    if artist_id:
-        payments = payments.filter(artist_id=artist_id)
+    payee_id = request.GET.get('payee_id', '').strip()
+    if payee_id:
+        payments = payments.filter(payee_id=payee_id)
+
+    payee_type = request.GET.get('payee_type', '').strip()
+    if payee_type:
+        payments = payments.filter(payee_type=payee_type)
 
     # Pagination
     page = max(int(request.GET.get('page', 1)), 1)
@@ -172,16 +186,25 @@ def payment_status_list(request):
 
     results = []
     for ps in payments_page:
+        payee_name = None
+        if ps.payee_type == 'artist':
+            try:
+                payee_name = Artist.objects.get(id=ps.payee_id).name
+            except Artist.DoesNotExist:
+                payee_name = f'Artist #{ps.payee_id}'
+
         results.append({
             'id': ps.id,
-            'artist_id': ps.artist_id,
-            'artist_name': ps.artist.name if ps.artist else None,
-            'period_start': ps.period_start.isoformat(),
-            'period_end': ps.period_end.isoformat(),
-            'amount': str(ps.amount),
-            'currency': ps.currency,
+            'payee_type': ps.payee_type,
+            'payee_id': ps.payee_id,
+            'payee_name': payee_name,
+            'period_month': ps.period_month,
+            'period_year': ps.period_year,
+            'payment_amount': str(ps.payment_amount or 0),
+            'payment_method': ps.payment_method,
             'status': ps.status,
-            'initiated_by': ps.initiated_by,
+            'invoice_date': ps.invoice_date.isoformat() if ps.invoice_date else None,
+            'payment_date': ps.payment_date.isoformat() if ps.payment_date else None,
             'notes': ps.notes,
             'created_at': ps.created_at.isoformat(),
         })
@@ -210,27 +233,27 @@ def payment_status_create(request):
         return Response({'error': 'Only super_user can create payments'}, status=status.HTTP_403_FORBIDDEN)
 
     data = request.data
-    artist_id = data.get('artist_id')
-    if not artist_id:
-        return Response({'error': 'artist_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+    payee_type = data.get('payee_type', 'artist')
+    payee_id = data.get('payee_id')
+    if not payee_id:
+        return Response({'error': 'payee_id is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    artist = Artist.objects.filter(id=artist_id).first()
-    if not artist:
-        return Response({'error': 'Artist not found'}, status=status.HTTP_404_NOT_FOUND)
-
-    required = ['period_start', 'period_end', 'amount']
+    required = ['period_month', 'period_year']
     for field in required:
         if not data.get(field):
             return Response({'error': f'{field} is required'}, status=status.HTTP_400_BAD_REQUEST)
 
     payment = PaymentStatus.objects.create(
-        artist=artist,
-        period_start=data['period_start'],
-        period_end=data['period_end'],
-        amount=data['amount'],
-        currency=data.get('currency', 'USD'),
-        status=data.get('status', 'pending'),
-        initiated_by=admin.google_email,
+        payee_type=payee_type,
+        payee_id=payee_id,
+        period_month=int(data['period_month']),
+        period_year=int(data['period_year']),
+        payment_amount=data.get('payment_amount'),
+        payment_method=data.get('payment_method'),
+        status=data.get('status', 'unpaid'),
+        invoice_date=data.get('invoice_date'),
+        payment_date=data.get('payment_date'),
+        updated_by=admin,
         notes=data.get('notes', ''),
     )
 
@@ -239,14 +262,15 @@ def payment_status_create(request):
         action='create',
         entity_type='payment_status',
         entity_id=str(payment.id),
-        changes={'artist': artist.name, 'amount': str(payment.amount), 'status': payment.status},
+        changes={'payee': f'{payee_type}:{payee_id}', 'amount': str(payment.payment_amount or 0), 'status': payment.status},
         request=request,
     )
 
     return Response({
         'id': payment.id,
-        'artist_name': artist.name,
-        'amount': str(payment.amount),
+        'payee_type': payee_type,
+        'payee_id': payee_id,
+        'payment_amount': str(payment.payment_amount or 0),
         'status': payment.status,
         'message': 'Payment record created.',
     }, status=status.HTTP_201_CREATED)
@@ -275,8 +299,13 @@ def payment_status_update(request, pk):
         payment.status = data['status']
     if 'notes' in data:
         payment.notes = data['notes']
-    if 'amount' in data:
-        payment.amount = data['amount']
+    if 'payment_amount' in data:
+        payment.payment_amount = data['payment_amount']
+    if 'payment_method' in data:
+        payment.payment_method = data['payment_method']
+    if 'payment_date' in data:
+        payment.payment_date = data['payment_date']
+    payment.updated_by = admin
 
     payment.save()
 
@@ -355,6 +384,7 @@ def revenue_summary(request):
     """
     GET /admin/revenue/summary/
     Revenue summary/overview with aggregated metrics.
+    Returns flat shape matching AdminRevenueSummary frontend type.
     """
     admin = get_admin_user(request)
     if not admin:
@@ -363,46 +393,42 @@ def revenue_summary(request):
     if admin.role not in ('super_user', 'product_manager'):
         return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
 
-    # Transaction stats
-    tx_stats = XsollaTransaction.objects.filter(status='paid').aggregate(
+    # Total transaction stats (all paid)
+    tx_all = XsollaTransaction.objects.filter(status='paid').aggregate(
         total_revenue=Sum('amount'),
         total_transactions=Count('id'),
         total_discs_granted=Sum('discs_granted'),
         total_gems_granted=Sum('gems_granted'),
     )
 
+    # Live vs sandbox breakdown
+    tx_live = XsollaTransaction.objects.filter(status='paid', is_sandbox=False).aggregate(
+        revenue=Sum('amount'),
+    )
+    tx_sandbox = XsollaTransaction.objects.filter(status='paid', is_sandbox=True).aggregate(
+        revenue=Sum('amount'),
+    )
+
     # Payment status breakdown
     payment_stats = PaymentStatus.objects.values('status').annotate(
         count=Count('id'),
-        total_amount=Sum('amount'),
     )
-    payment_breakdown = {}
+    total_payments = 0
+    by_status = {}
     for ps in payment_stats:
-        payment_breakdown[ps['status']] = {
-            'count': ps['count'],
-            'total_amount': str(ps['total_amount'] or 0),
-        }
-
-    # Artists with balance
-    artists_with_balance = Artist.objects.filter(
-        current_balance__gt=0
-    ).count()
-
-    total_outstanding = Artist.objects.filter(
-        current_balance__gt=0
-    ).aggregate(total=Sum('current_balance'))['total'] or 0
+        by_status[ps['status']] = ps['count']
+        total_payments += ps['count']
 
     data = {
-        'transactions': {
-            'total_revenue': str(tx_stats['total_revenue'] or 0),
-            'total_transactions': tx_stats['total_transactions'] or 0,
-            'total_discs_granted': tx_stats['total_discs_granted'] or 0,
-            'total_gems_granted': tx_stats['total_gems_granted'] or 0,
-        },
-        'payments': payment_breakdown,
-        'payees': {
-            'artists_with_balance': artists_with_balance,
-            'total_outstanding': total_outstanding,
+        'total_transactions': tx_all['total_transactions'] or 0,
+        'total_revenue': str(tx_all['total_revenue'] or 0),
+        'live_revenue': str(tx_live['revenue'] or 0),
+        'sandbox_revenue': str(tx_sandbox['revenue'] or 0),
+        'total_discs_granted': tx_all['total_discs_granted'] or 0,
+        'total_gems_granted': tx_all['total_gems_granted'] or 0,
+        'payments': {
+            'total': total_payments,
+            'by_status': by_status,
         },
     }
 

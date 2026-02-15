@@ -13,9 +13,8 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from django.db.models import Count, Sum, Avg, Max, Min, Q, F
-from django.db.models.functions import TruncDate, TruncMonth
+from django.db.models.functions import TruncMonth
 from django.utils import timezone
-from datetime import timedelta
 
 from .models import (
     Player, Profile, Song, Artist, Label, Genre, Country,
@@ -30,7 +29,7 @@ from .admin_utils import get_admin_user
 def business_overview(request):
     """
     GET /admin/business/overview/
-    Main dashboard KPIs: total users, songs, artists, revenue, etc.
+    Returns flat shape matching AdminBusinessOverview.
     """
     admin = get_admin_user(request)
     if not admin:
@@ -39,51 +38,18 @@ def business_overview(request):
     if admin.role not in ('super_user', 'product_manager'):
         return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
 
-    now = timezone.now()
-    thirty_days_ago = now - timedelta(days=30)
-    seven_days_ago = now - timedelta(days=7)
-
-    # Core counts
-    total_players = Player.objects.count()
-    active_players = Player.objects.filter(status='active').count()
-    total_songs = Song.objects.count()
-    active_songs = Song.objects.filter(status='active').count()
-    total_artists = Artist.objects.count()
-
-    # Play stats
-    total_plays = PlayerSongInstance.objects.aggregate(
-        total=Sum('no_of_plays'))['total'] or 0
-
-    # Revenue
     total_revenue = XsollaTransaction.objects.filter(
         status='paid'
     ).aggregate(total=Sum('amount'))['total'] or 0
 
-    # Label distribution
-    label_dist = Artist.objects.values('label__name').annotate(
-        count=Count('id')
-    ).order_by('-count')
-
     data = {
-        'players': {
-            'total': total_players,
-            'active': active_players,
-        },
-        'content': {
-            'total_songs': total_songs,
-            'active_songs': active_songs,
-            'total_artists': total_artists,
-        },
-        'engagement': {
-            'total_plays': total_plays,
-        },
-        'revenue': {
-            'total': str(total_revenue),
-        },
-        'labels': [
-            {'name': item['label__name'] or 'Unassigned', 'count': item['count']}
-            for item in label_dist
-        ],
+        'total_songs': Song.objects.count(),
+        'active_songs': Song.objects.filter(status='active').count(),
+        'total_artists': Artist.objects.count(),
+        'total_players': Player.objects.count(),
+        'total_transactions': XsollaTransaction.objects.filter(status='paid').count(),
+        'total_revenue': str(total_revenue),
+        'total_labels': Label.objects.count(),
     }
 
     return Response(data)
@@ -95,7 +61,7 @@ def business_overview(request):
 def business_users(request):
     """
     GET /admin/business/users/
-    User growth and activity metrics.
+    Returns flat shape matching AdminBusinessUsers.
     """
     admin = get_admin_user(request)
     if not admin:
@@ -104,58 +70,27 @@ def business_users(request):
     if admin.role not in ('super_user', 'product_manager'):
         return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
 
-    # Status breakdown
-    status_breakdown = Player.objects.values('status').annotate(
-        count=Count('id')
-    )
+    total_players = Player.objects.count()
+    active_players = Player.objects.filter(status='active').count()
+    frozen_players = Player.objects.filter(status='frozen').count()
+    kicked_players = Player.objects.filter(status='kicked').count()
 
-    # Level distribution
-    level_dist = Player.objects.values('level').annotate(
-        count=Count('id')
-    ).order_by('level')
+    # Players who have at least one paid transaction
+    players_with_purchases = XsollaTransaction.objects.filter(
+        status='paid'
+    ).values('player').distinct().count()
 
-    # Average stats
-    avg_stats = Player.objects.aggregate(
-        avg_level=Avg('level'),
-        avg_discs=Avg('total_discs'),
-        avg_gems=Avg('total_gems'),
-        avg_stars=Avg('total_stars'),
-        max_level=Max('level'),
-    )
-
-    # Top players by level
-    top_players = Player.objects.select_related(
-        'profile__user'
-    ).order_by('-level', '-total_stars')[:10]
-    top_data = []
-    for p in top_players:
-        user = p.profile.user if p.profile else None
-        top_data.append({
-            'id': p.id,
-            'email': user.email if user else None,
-            'level': p.level,
-            'total_stars': p.total_stars,
-            'total_discs': p.total_discs,
-            'total_gems': p.total_gems,
-        })
+    total_song_instances = PlayerSongInstance.objects.count()
+    avg_songs_per_player = round(total_song_instances / total_players, 2) if total_players > 0 else 0
 
     data = {
-        'total_players': Player.objects.count(),
-        'status_breakdown': {
-            item['status']: item['count'] for item in status_breakdown
-        },
-        'level_distribution': [
-            {'level': item['level'], 'count': item['count']}
-            for item in level_dist
-        ],
-        'averages': {
-            'avg_level': round(avg_stats['avg_level'] or 0, 1),
-            'avg_discs': round(avg_stats['avg_discs'] or 0, 1),
-            'avg_gems': round(avg_stats['avg_gems'] or 0, 1),
-            'avg_stars': round(avg_stats['avg_stars'] or 0, 1),
-            'max_level': avg_stats['max_level'] or 0,
-        },
-        'top_players': top_data,
+        'total_players': total_players,
+        'active_players': active_players,
+        'frozen_players': frozen_players,
+        'kicked_players': kicked_players,
+        'players_with_purchases': players_with_purchases,
+        'total_song_instances': total_song_instances,
+        'avg_songs_per_player': avg_songs_per_player,
     }
 
     return Response(data)
@@ -167,7 +102,7 @@ def business_users(request):
 def business_content(request):
     """
     GET /admin/business/content/
-    Content catalog metrics: songs by status, genre, country, label.
+    Returns flat shape matching AdminBusinessContent.
     """
     admin = get_admin_user(request)
     if not admin:
@@ -176,61 +111,46 @@ def business_content(request):
     if admin.role not in ('super_user', 'product_manager'):
         return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
 
-    # Songs by status
-    by_status = Song.objects.values('status').annotate(count=Count('id'))
+    total_songs = Song.objects.count()
+    active_songs = Song.objects.filter(status='active').count()
+    inactive_songs = Song.objects.filter(status='inactive').count()
+    total_artists = Artist.objects.count()
 
-    # Songs by difficulty
-    by_difficulty = Song.objects.values('difficulty').annotate(count=Count('id'))
+    # By platform: flat dict
+    by_platform_qs = Song.objects.values('platform').annotate(count=Count('id'))
+    by_platform = {item['platform'] or 'unknown': item['count'] for item in by_platform_qs}
 
-    # Songs by genre
-    by_genre = Song.objects.values('genre__name').annotate(
+    # By difficulty: flat dict
+    by_difficulty_qs = Song.objects.values('difficulty').annotate(count=Count('id'))
+    by_difficulty = {item['difficulty'] or 'unknown': item['count'] for item in by_difficulty_qs}
+
+    # By country: array of {country, count}
+    by_country_qs = Song.objects.values('country__name').annotate(
         count=Count('id')
     ).order_by('-count')
+    by_country = [
+        {'country': item['country__name'] or 'Unset', 'count': item['count']}
+        for item in by_country_qs
+    ]
 
-    # Songs by country
-    by_country = Song.objects.values('country__name').annotate(
+    # Languages: array of {language, count}
+    languages_qs = Song.objects.values('language').annotate(
         count=Count('id')
     ).order_by('-count')
-
-    # Songs by label
-    by_label = Song.objects.values('artist__label__name').annotate(
-        count=Count('id')
-    ).order_by('-count')
-
-    # Songs by platform
-    by_platform = Song.objects.values('platform').annotate(count=Count('id'))
-
-    # Artists by label
-    artists_by_label = Artist.objects.values('label__name').annotate(
-        count=Count('id')
-    ).order_by('-count')
+    languages = [
+        {'language': item['language'] or 'Unknown', 'count': item['count']}
+        for item in languages_qs
+    ]
 
     data = {
-        'songs': {
-            'total': Song.objects.count(),
-            'by_status': {item['status']: item['count'] for item in by_status},
-            'by_difficulty': {item['difficulty']: item['count'] for item in by_difficulty},
-            'by_genre': [
-                {'name': item['genre__name'] or 'Unset', 'count': item['count']}
-                for item in by_genre
-            ],
-            'by_country': [
-                {'name': item['country__name'] or 'Unset', 'count': item['count']}
-                for item in by_country
-            ],
-            'by_label': [
-                {'name': item['artist__label__name'] or 'Unlinked', 'count': item['count']}
-                for item in by_label
-            ],
-            'by_platform': {item['platform']: item['count'] for item in by_platform},
-        },
-        'artists': {
-            'total': Artist.objects.count(),
-            'by_label': [
-                {'name': item['label__name'] or 'Unassigned', 'count': item['count']}
-                for item in artists_by_label
-            ],
-        },
+        'total_songs': total_songs,
+        'active_songs': active_songs,
+        'inactive_songs': inactive_songs,
+        'total_artists': total_artists,
+        'by_platform': by_platform,
+        'by_difficulty': by_difficulty,
+        'by_country': by_country,
+        'languages': languages,
     }
 
     return Response(data)
@@ -242,7 +162,7 @@ def business_content(request):
 def business_engagement(request):
     """
     GET /admin/business/engagement/
-    Engagement and play metrics.
+    Returns flat shape matching AdminBusinessEngagement.
     """
     admin = get_admin_user(request)
     if not admin:
@@ -251,64 +171,61 @@ def business_engagement(request):
     if admin.role not in ('super_user', 'product_manager'):
         return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
 
-    # Overall play stats
     overall = PlayerSongInstance.objects.aggregate(
         total_plays=Sum('no_of_plays'),
         total_instances=Count('id'),
-        avg_plays_per_song=Avg('no_of_plays'),
+        avg_plays=Avg('no_of_plays'),
         avg_high_score=Avg('high_score'),
-        total_favourited=Count('id', filter=Q(favourited=True)),
-        total_unlocked=Count('id', filter=Q(unlocked=True)),
     )
 
-    # Top songs by plays
-    top_songs = PlayerSongInstance.objects.values(
+    total_song_instances = overall['total_instances'] or 0
+    total_plays = overall['total_plays'] or 0
+    avg_plays_per_instance = round(overall['avg_plays'] or 0, 2)
+    avg_high_score = round(overall['avg_high_score'] or 0, 1)
+
+    # Top songs: {song_id, song_name, artist_name, total_plays, player_count}
+    top_songs_qs = PlayerSongInstance.objects.values(
         'song__id', 'song__song_name', 'song__artist_name'
     ).annotate(
         total_plays=Sum('no_of_plays'),
-        unique_players=Count('player', distinct=True),
-        avg_score=Avg('high_score'),
+        player_count=Count('player', distinct=True),
     ).order_by('-total_plays')[:15]
 
-    top_songs_data = []
-    for item in top_songs:
-        top_songs_data.append({
+    top_songs = [
+        {
             'song_id': item['song__id'],
             'song_name': item['song__song_name'],
             'artist_name': item['song__artist_name'],
             'total_plays': item['total_plays'] or 0,
-            'unique_players': item['unique_players'] or 0,
-            'avg_score': round(item['avg_score'] or 0, 1),
-        })
+            'player_count': item['player_count'] or 0,
+        }
+        for item in top_songs_qs
+    ]
 
-    # Top artists by plays
-    top_artists = PlayerSongInstance.objects.values(
-        'song__artist__id', 'song__artist__name'
+    # Top artists: {artist_name, total_plays, song_count}
+    top_artists_qs = PlayerSongInstance.objects.values(
+        'song__artist__name'
     ).annotate(
         total_plays=Sum('no_of_plays'),
-        unique_players=Count('player', distinct=True),
+        song_count=Count('song', distinct=True),
     ).order_by('-total_plays')[:10]
 
-    top_artists_data = []
-    for item in top_artists:
-        top_artists_data.append({
-            'artist_id': item['song__artist__id'],
-            'artist_name': item['song__artist__name'],
+    top_artists = [
+        {
+            'artist_name': item['song__artist__name'] or 'Unknown',
             'total_plays': item['total_plays'] or 0,
-            'unique_players': item['unique_players'] or 0,
-        })
+            'song_count': item['song_count'] or 0,
+        }
+        for item in top_artists_qs
+    ]
 
     data = {
-        'overview': {
-            'total_plays': overall['total_plays'] or 0,
-            'total_song_instances': overall['total_instances'] or 0,
-            'avg_plays_per_song': round(overall['avg_plays_per_song'] or 0, 1),
-            'avg_high_score': round(overall['avg_high_score'] or 0, 1),
-            'total_favourited': overall['total_favourited'] or 0,
-            'total_unlocked': overall['total_unlocked'] or 0,
-        },
-        'top_songs': top_songs_data,
-        'top_artists': top_artists_data,
+        'total_song_instances': total_song_instances,
+        'total_plays': total_plays,
+        'avg_plays_per_instance': avg_plays_per_instance,
+        'avg_high_score': avg_high_score,
+        'top_songs': top_songs,
+        'top_artists': top_artists,
     }
 
     return Response(data)
@@ -320,7 +237,7 @@ def business_engagement(request):
 def business_revenue_analytics(request):
     """
     GET /admin/business/revenue/
-    Revenue analytics: totals, by period, sandbox vs live.
+    Returns flat shape matching AdminBusinessRevenue.
     """
     admin = get_admin_user(request)
     if not admin:
@@ -329,7 +246,6 @@ def business_revenue_analytics(request):
     if admin.role not in ('super_user', 'product_manager'):
         return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
 
-    # Overall
     overall = XsollaTransaction.objects.filter(status='paid').aggregate(
         total_revenue=Sum('amount'),
         total_transactions=Count('id'),
@@ -337,23 +253,16 @@ def business_revenue_analytics(request):
         total_gems=Sum('gems_granted'),
     )
 
-    # Sandbox vs live
-    sandbox_stats = XsollaTransaction.objects.filter(
-        status='paid', is_sandbox=True
-    ).aggregate(
-        count=Count('id'),
-        total=Sum('amount'),
-    )
-
-    live_stats = XsollaTransaction.objects.filter(
+    live_rev = XsollaTransaction.objects.filter(
         status='paid', is_sandbox=False
-    ).aggregate(
-        count=Count('id'),
-        total=Sum('amount'),
-    )
+    ).aggregate(total=Sum('amount'))['total'] or 0
 
-    # Monthly breakdown
-    monthly = XsollaTransaction.objects.filter(
+    sandbox_rev = XsollaTransaction.objects.filter(
+        status='paid', is_sandbox=True
+    ).aggregate(total=Sum('amount'))['total'] or 0
+
+    # Monthly breakdown: {month, count, total}
+    monthly_qs = XsollaTransaction.objects.filter(
         status='paid'
     ).annotate(
         month=TruncMonth('created_at')
@@ -362,30 +271,23 @@ def business_revenue_analytics(request):
         total=Sum('amount'),
     ).order_by('month')
 
-    monthly_data = []
-    for item in monthly:
-        monthly_data.append({
-            'month': item['month'].isoformat() if item['month'] else None,
-            'transactions': item['count'],
-            'revenue': str(item['total'] or 0),
-        })
+    by_month = [
+        {
+            'month': item['month'].strftime('%Y-%m') if item['month'] else 'Unknown',
+            'count': item['count'],
+            'total': str(item['total'] or 0),
+        }
+        for item in monthly_qs
+    ]
 
     data = {
-        'overall': {
-            'total_revenue': str(overall['total_revenue'] or 0),
-            'total_transactions': overall['total_transactions'] or 0,
-            'total_discs_granted': overall['total_discs'] or 0,
-            'total_gems_granted': overall['total_gems'] or 0,
-        },
-        'sandbox': {
-            'transactions': sandbox_stats['count'] or 0,
-            'revenue': str(sandbox_stats['total'] or 0),
-        },
-        'live': {
-            'transactions': live_stats['count'] or 0,
-            'revenue': str(live_stats['total'] or 0),
-        },
-        'monthly': monthly_data,
+        'total_transactions': overall['total_transactions'] or 0,
+        'total_revenue': str(overall['total_revenue'] or 0),
+        'live_revenue': str(live_rev),
+        'sandbox_revenue': str(sandbox_rev),
+        'total_discs_granted': overall['total_discs'] or 0,
+        'total_gems_granted': overall['total_gems'] or 0,
+        'by_month': by_month,
     }
 
     return Response(data)
@@ -397,7 +299,7 @@ def business_revenue_analytics(request):
 def business_geography(request):
     """
     GET /admin/business/geography/
-    Geographic distribution of content and users.
+    Returns shape matching AdminBusinessGeography.
     """
     admin = get_admin_user(request)
     if not admin:
@@ -406,59 +308,29 @@ def business_geography(request):
     if admin.role not in ('super_user', 'product_manager'):
         return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
 
-    # Songs by country
-    songs_by_country = Song.objects.values(
-        'country__name', 'country__code'
-    ).annotate(
-        song_count=Count('id'),
-        total_plays=Sum('playersonginstance__no_of_plays'),
-    ).order_by('-song_count')
+    # songs_by_country: [{country, count}]
+    songs_qs = Song.objects.values('country__name').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    songs_by_country = [
+        {'country': item['country__name'] or 'Unset', 'count': item['count']}
+        for item in songs_qs
+    ]
 
-    songs_geo = []
-    for item in songs_by_country:
-        songs_geo.append({
-            'country': item['country__name'] or 'Unset',
-            'code': item['country__code'] or '',
-            'song_count': item['song_count'],
-            'total_plays': item['total_plays'] or 0,
-        })
-
-    # Users by country (from profile.country)
-    users_by_country = Profile.objects.filter(
+    # players_by_country: [{country, count}]
+    players_qs = Profile.objects.filter(
         country__isnull=False
-    ).values(
-        'country__name', 'country__code'
-    ).annotate(
-        user_count=Count('id'),
-    ).order_by('-user_count')
-
-    users_geo = []
-    for item in users_by_country:
-        users_geo.append({
-            'country': item['country__name'],
-            'code': item['country__code'] or '',
-            'user_count': item['user_count'],
-        })
-
-    # Countries in system
-    countries = Country.objects.annotate(
-        song_count=Count('song'),
-        tribe_count=Count('tribe'),
-    ).order_by('name')
-    countries_data = []
-    for c in countries:
-        countries_data.append({
-            'id': c.id,
-            'name': c.name,
-            'code': c.code,
-            'song_count': c.song_count,
-            'tribe_count': c.tribe_count,
-        })
+    ).values('country__name').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    players_by_country = [
+        {'country': item['country__name'], 'count': item['count']}
+        for item in players_qs
+    ]
 
     data = {
-        'songs_by_country': songs_geo,
-        'users_by_country': users_geo,
-        'countries': countries_data,
+        'songs_by_country': songs_by_country,
+        'players_by_country': players_by_country,
     }
 
     return Response(data)

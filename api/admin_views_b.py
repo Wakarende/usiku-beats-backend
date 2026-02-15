@@ -167,7 +167,7 @@ def user_detail(request, pk):
     for k in kicks:
         kicks_data.append({
             'reason': k.reason,
-            'kicked_by': k.kicked_by,
+            'kicked_by': k.kicked_by.google_email if k.kicked_by else 'unknown',
             'kicked_at': k.kicked_at.isoformat(),
         })
 
@@ -308,7 +308,7 @@ def user_kick(request, pk):
     KickedPlayer.objects.create(
         player=player,
         reason=reason,
-        kicked_by=admin.google_email,
+        kicked_by=admin,
     )
 
     log_audit(

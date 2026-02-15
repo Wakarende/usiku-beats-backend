@@ -89,38 +89,43 @@ class AuditLog(models.Model):
 
 
 class PaymentStatus(models.Model):
-    """Track payment processing status for artist payouts."""
+    """Track payment processing status for payee payouts."""
     STATUS_CHOICES = (
+        ('unpaid', 'Unpaid'),
         ('pending', 'Pending'),
         ('processing', 'Processing'),
         ('completed', 'Completed'),
         ('failed', 'Failed'),
     )
 
-    artist = models.ForeignKey('Artist', on_delete=models.CASCADE, related_name='payment_statuses')
-    period_start = models.DateField()
-    period_end = models.DateField()
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
-    currency = models.CharField(max_length=10, default='USD')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    initiated_by = models.EmailField(blank=True, null=True)
+    payee_type = models.CharField(max_length=20)
+    payee_id = models.BigIntegerField()
+    period_month = models.IntegerField()
+    period_year = models.IntegerField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='unpaid')
+    invoice_date = models.DateField(blank=True, null=True)
+    payment_date = models.DateField(blank=True, null=True)
+    payment_amount = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    payment_method = models.CharField(max_length=50, blank=True, null=True)
     notes = models.TextField(blank=True, null=True)
+    updated_by = models.ForeignKey(AdminUser, on_delete=models.SET_NULL, null=True, blank=True, db_column="updated_by_id")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'api_payment_status'
         ordering = ['-created_at']
+        unique_together = [['payee_type', 'payee_id', 'period_month', 'period_year']]
 
     def __str__(self):
-        return f'{self.artist} - {self.status} - {self.amount} {self.currency}'
+        return f'{self.payee_type}:{self.payee_id} - {self.period_year}/{self.period_month} - {self.status}'
 
 
 class KickedPlayer(models.Model):
     """Record of players removed from the platform."""
-    player = models.ForeignKey('Player', on_delete=models.CASCADE, related_name='kick_records')
+    player = models.ForeignKey("Player", on_delete=models.CASCADE, related_name="kick_records", db_column="original_player_id")
     reason = models.TextField()
-    kicked_by = models.EmailField()
+    kicked_by = models.ForeignKey("AdminUser", on_delete=models.SET_NULL, null=True, blank=True, db_column="kicked_by_id")
     kicked_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -128,36 +133,40 @@ class KickedPlayer(models.Model):
         ordering = ['-kicked_at']
 
     def __str__(self):
-        return f'Player {self.player_id} kicked by {self.kicked_by}'
+        return f'Player {self.player_id} kicked by {self.kicked_by.google_email if self.kicked_by else "unknown"}'
 
 
 class ContentSuggestion(models.Model):
-    """AI-generated content suggestions for the catalog."""
-    TYPE_CHOICES = (
-        ('song', 'Song'),
-        ('artist', 'Artist'),
-        ('genre', 'Genre'),
-    )
+    """Content suggestions scraped from external charts/sources."""
     STATUS_CHOICES = (
-        ('pending', 'Pending'),
+        ('new', 'New'),
         ('approved', 'Approved'),
-        ('rejected', 'Rejected'),
+        ('dismissed', 'Dismissed'),
     )
 
-    suggestion_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
-    title = models.CharField(max_length=200)
-    detail = models.JSONField(blank=True, null=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    reviewed_by = models.EmailField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    external_source = models.CharField(max_length=100)
+    external_id = models.CharField(max_length=200, blank=True, null=True)
+    song_title = models.CharField(max_length=200)
+    artist_name = models.CharField(max_length=200)
+    genre = models.CharField(max_length=100, blank=True, null=True)
+    chart_regions = models.JSONField(blank=True, null=True)
+    peak_position = models.IntegerField(blank=True, null=True)
+    current_popularity = models.IntegerField(blank=True, null=True)
+    first_seen = models.DateTimeField(auto_now_add=True)
+    weeks_trending = models.IntegerField(default=1)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
+    dismissed_reason = models.TextField(blank=True, null=True)
+    acted_by = models.ForeignKey("AdminUser", on_delete=models.SET_NULL, null=True, blank=True, db_column="acted_by_id")
+    acted_at = models.DateTimeField(blank=True, null=True)
+    linked_song = models.ForeignKey("Song", on_delete=models.SET_NULL, null=True, blank=True, db_column="linked_song_id")
+    data = models.JSONField(blank=True, null=True)
 
     class Meta:
         db_table = 'api_content_suggestion'
-        ordering = ['-created_at']
+        ordering = ['-first_seen']
 
     def __str__(self):
-        return f'{self.suggestion_type}: {self.title} ({self.status})'
+        return f'{self.song_title} by {self.artist_name} ({self.status})'
 
 
 # ============================================================
