@@ -2,6 +2,168 @@ from django.db import models
 from django.contrib.auth.models import Permission, User
 
 
+# ============================================================
+# NEW TABLES (Admin Dashboard)
+# ============================================================
+
+class Label(models.Model):
+    """Record labels for artist categorization."""
+    name = models.CharField(max_length=100, unique=True)
+    is_system = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'api_label'
+
+    def __str__(self):
+        return self.name
+
+
+class AdminUser(models.Model):
+    """Admin dashboard users authenticated via Google OAuth."""
+    ROLE_CHOICES = (
+        ('content_editor', 'Content Editor'),
+        ('product_manager', 'Product Manager'),
+        ('super_user', 'Super User'),
+    )
+    STATUS_CHOICES = (
+        ('active', 'Active'),
+        ('suspended', 'Suspended'),
+    )
+
+    google_email = models.EmailField(unique=True)
+    display_name = models.CharField(max_length=100)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='content_editor')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'api_admin_user'
+
+    def __str__(self):
+        return f'{self.display_name} ({self.google_email})'
+
+
+class GameSettings(models.Model):
+    """Versioned game economy settings with effective date ranges."""
+    VALUE_TYPE_CHOICES = (
+        ('integer', 'Integer'),
+        ('decimal', 'Decimal'),
+        ('string', 'String'),
+        ('boolean', 'Boolean'),
+    )
+
+    key = models.CharField(max_length=100)
+    value = models.CharField(max_length=255)
+    value_type = models.CharField(max_length=20, choices=VALUE_TYPE_CHOICES, default='string')
+    description = models.TextField(blank=True, null=True)
+    effective_from = models.DateTimeField()
+    effective_to = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'api_game_settings'
+        unique_together = ('key', 'effective_from')
+        ordering = ['key', '-effective_from']
+
+    def __str__(self):
+        return f'{self.key} = {self.value}'
+
+
+class AuditLog(models.Model):
+    """Immutable audit trail for all admin actions."""
+    admin_email = models.EmailField()
+    action = models.CharField(max_length=50)
+    entity_type = models.CharField(max_length=50)
+    entity_id = models.CharField(max_length=50, blank=True, null=True)
+    changes = models.JSONField(blank=True, null=True)
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'api_audit_log'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.admin_email} - {self.action} {self.entity_type} - {self.created_at}'
+
+
+class PaymentStatus(models.Model):
+    """Track payment processing status for artist payouts."""
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    )
+
+    artist = models.ForeignKey('Artist', on_delete=models.CASCADE, related_name='payment_statuses')
+    period_start = models.DateField()
+    period_end = models.DateField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    currency = models.CharField(max_length=10, default='USD')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    initiated_by = models.EmailField(blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'api_payment_status'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.artist} - {self.status} - {self.amount} {self.currency}'
+
+
+class KickedPlayer(models.Model):
+    """Record of players removed from the platform."""
+    player = models.ForeignKey('Player', on_delete=models.CASCADE, related_name='kick_records')
+    reason = models.TextField()
+    kicked_by = models.EmailField()
+    kicked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'api_kicked_players'
+        ordering = ['-kicked_at']
+
+    def __str__(self):
+        return f'Player {self.player_id} kicked by {self.kicked_by}'
+
+
+class ContentSuggestion(models.Model):
+    """AI-generated content suggestions for the catalog."""
+    TYPE_CHOICES = (
+        ('song', 'Song'),
+        ('artist', 'Artist'),
+        ('genre', 'Genre'),
+    )
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    )
+
+    suggestion_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    title = models.CharField(max_length=200)
+    detail = models.JSONField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    reviewed_by = models.EmailField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'api_content_suggestion'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.suggestion_type}: {self.title} ({self.status})'
+
+
+# ============================================================
+# EXISTING TABLES (with new fields added)
+# ============================================================
+
 class Profile(models.Model):
     user = models.OneToOneField(
         User, default=None, on_delete=models.CASCADE, null=True)
@@ -10,6 +172,10 @@ class Profile(models.Model):
     receive_notifications = models.BooleanField(default=True)
     recent_ip_address = models.GenericIPAddressField(blank=True, null=True)
     google_id = models.CharField(max_length=255, blank=True, null=True, unique=True)
+
+    # New fields (admin dashboard)
+    country = models.ForeignKey('Country', on_delete=models.SET_NULL, blank=True, null=True)
+    country_source = models.CharField(max_length=30, blank=True, null=True, default='unknown')
 
     def __str__(self):
         return self.user.email
@@ -25,15 +191,19 @@ class Artist(models.Model):
     preferred_payout_method = models.CharField(choices=[('mpesa', 'mpesa')], default='mpesa', blank=True, null=True, max_length=10)
     revenue_earned = models.FloatField(blank=True, null=True)
     current_balance = models.FloatField(blank=True, null=True)
-    
+
     bio = models.TextField(null=True, blank=True)
     spotify_link = models.URLField(null=True, blank=True)
     twitter_link = models.URLField(null=True, blank=True)
     youtube_link = models.URLField(null=True, blank=True)
     instagram_link = models.URLField(null=True, blank=True)
     website_link = models.URLField(null=True, blank=True)
-    
+
     data = models.JSONField(blank=True, null=True)
+
+    # New fields (admin dashboard)
+    label = models.ForeignKey(Label, on_delete=models.SET_NULL, blank=True, null=True, related_name='artists')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='created_artists')
 
     def __str__(self):
         return self.name
@@ -121,30 +291,42 @@ class Song(models.Model):
     consumer_price_per_play = models.FloatField(blank=True, null=True)
     artist_revenue_per_play = models.FloatField(blank=True, null=True)
     # average_score = models.IntegerField(blank=True, null=True)
-    
+
     platform = models.CharField(choices=[('usiku', 'usiku'), ('mdundo', 'mdundo')], max_length=10, default='usiku')
     promoted = models.BooleanField(default=False)
     data = models.JSONField(blank=True, null=True)
 
-
+    # New fields (admin dashboard)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='created_songs')
+    go_live_date = models.DateTimeField(blank=True, null=True)
+    expiry_date = models.DateTimeField(blank=True, null=True)
+    language = models.CharField(max_length=50, blank=True, null=True)
 
     def __str__(self):
         return f'{self.artist_name} - {self.song_name} - {self.id}'
 
 
 class Player(models.Model):
+    PLAYER_STATUS_CHOICES = (
+        ('active', 'Active'),
+        ('frozen', 'Frozen'),
+        ('kicked', 'Kicked'),
+    )
+
     profile = models.OneToOneField(
         Profile, default=None, on_delete=models.CASCADE, null=True)
 
     calibration = models.FloatField(blank=True, null=True)
-    
+
     level = models.IntegerField(default=1)
     total_discs = models.FloatField(default=0)
     total_gems = models.FloatField(default=0)
     total_stars = models.FloatField(default=0)
 
-    
     data = models.JSONField(blank=True, null=True)
+
+    # New field (admin dashboard)
+    status = models.CharField(max_length=20, choices=PLAYER_STATUS_CHOICES, default='active')
 
     def __str__(self):
         return self.profile.user.email
