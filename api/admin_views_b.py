@@ -9,7 +9,7 @@ Endpoints:
 - POST   /admin/users/<pk>/kick/    - Kick a player (permanent removal)
 - GET    /admin/users/export/       - Export user data as CSV
 """
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -23,6 +23,7 @@ from .admin_utils import get_admin_user, log_audit
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def user_list(request):
     """
@@ -107,6 +108,7 @@ def user_list(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def user_detail(request, pk):
     """
@@ -198,6 +200,7 @@ def user_detail(request, pk):
 
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def user_freeze(request, pk):
     """
@@ -238,6 +241,7 @@ def user_freeze(request, pk):
 
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def user_unfreeze(request, pk):
     """
@@ -272,6 +276,7 @@ def user_unfreeze(request, pk):
 
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def user_kick(request, pk):
     """
@@ -319,6 +324,7 @@ def user_kick(request, pk):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def user_export(request):
     """

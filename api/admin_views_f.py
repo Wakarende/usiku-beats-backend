@@ -7,7 +7,7 @@ Endpoints:
 - POST   /admin/suggestions/<pk>/status/        - Update suggestion status (approve/reject)
 - POST   /admin/suggestions/ingest/             - Ingest a suggestion (create song/artist from it)
 """
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -18,6 +18,7 @@ from .admin_utils import get_admin_user, log_audit
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def suggestion_list(request):
     """
@@ -74,6 +75,7 @@ def suggestion_list(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def suggestion_summary(request):
     """
@@ -97,6 +99,7 @@ def suggestion_summary(request):
 
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def suggestion_update_status(request, pk):
     """
@@ -138,6 +141,7 @@ def suggestion_update_status(request, pk):
 
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def suggestion_ingest(request):
     """

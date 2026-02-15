@@ -10,7 +10,7 @@ Endpoints:
 - GET    /admin/revenue/export/                - Export revenue data as CSV
 - GET    /admin/revenue/summary/               - Revenue summary/overview
 """
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -24,6 +24,7 @@ from .admin_utils import get_admin_user, log_audit
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def revenue_payee_list(request):
     """
@@ -77,6 +78,7 @@ def revenue_payee_list(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def revenue_payee_detail(request, pk):
     """
@@ -135,6 +137,7 @@ def revenue_payee_detail(request, pk):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def payment_status_list(request):
     """
@@ -192,6 +195,7 @@ def payment_status_list(request):
 
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def payment_status_create(request):
     """
@@ -249,6 +253,7 @@ def payment_status_create(request):
 
 
 @api_view(['PUT', 'PATCH'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def payment_status_update(request, pk):
     """
@@ -292,6 +297,7 @@ def payment_status_update(request, pk):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def revenue_export(request):
     """
@@ -343,6 +349,7 @@ def revenue_export(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def revenue_summary(request):
     """

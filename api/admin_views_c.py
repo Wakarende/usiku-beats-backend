@@ -13,7 +13,7 @@ Endpoints:
 - PUT    /admin/artists/<pk>/update/    - Update an artist
 - DELETE /admin/artists/<pk>/delete/    - Delete an artist
 """
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -29,6 +29,7 @@ from .admin_utils import get_admin_user, log_audit
 # ============================================================
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def song_list(request):
     """
@@ -131,6 +132,7 @@ def song_list(request):
 
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def song_create(request):
     """
@@ -209,6 +211,7 @@ def song_create(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def song_detail(request, pk):
     """
@@ -269,6 +272,7 @@ def song_detail(request, pk):
 
 
 @api_view(['PUT', 'PATCH'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def song_update(request, pk):
     """
@@ -324,6 +328,7 @@ def song_update(request, pk):
 
 
 @api_view(['DELETE'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def song_delete(request, pk):
     """
@@ -359,6 +364,7 @@ def song_delete(request, pk):
 # ============================================================
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def artist_list(request):
     """
@@ -423,6 +429,7 @@ def artist_list(request):
 
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def artist_create(request):
     """
@@ -475,6 +482,7 @@ def artist_create(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def artist_detail_admin(request, pk):
     """
@@ -538,6 +546,7 @@ def artist_detail_admin(request, pk):
 
 
 @api_view(['PUT', 'PATCH'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def artist_update(request, pk):
     """
@@ -584,6 +593,7 @@ def artist_update(request, pk):
 
 
 @api_view(['DELETE'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def artist_delete(request, pk):
     """

@@ -5,7 +5,7 @@ Phase A: Labels, Admin Users, Game Settings, Audit Log, Auth
 Authentication: Google OAuth token verified against api_admin_user table.
 All endpoints require the admin to be active in the admin_user table.
 """
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -26,6 +26,7 @@ from .admin_utils import get_admin_user, log_audit, get_admin_permissions
 # ============================================================
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def label_list(request):
     """GET /admin/labels/ - List all labels."""
@@ -39,6 +40,7 @@ def label_list(request):
 
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def label_create(request):
     """POST /admin/labels/ - Create a new label."""
@@ -68,6 +70,7 @@ def label_create(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def label_detail(request, pk):
     """GET /admin/labels/<pk>/ - Get label detail with artist list."""
@@ -87,6 +90,7 @@ def label_detail(request, pk):
 
 
 @api_view(['PUT', 'PATCH'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def label_update(request, pk):
     """PUT/PATCH /admin/labels/<pk>/ - Update a label."""
@@ -119,6 +123,7 @@ def label_update(request, pk):
 
 
 @api_view(['DELETE'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def label_delete(request, pk):
     """DELETE /admin/labels/<pk>/ - Delete a label (reassign artists to Unknown)."""
@@ -162,6 +167,7 @@ def label_delete(request, pk):
 # ============================================================
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def admin_user_list(request):
     """GET /admin/users/admins/ - List all admin users."""
@@ -178,6 +184,7 @@ def admin_user_list(request):
 
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def admin_user_create(request):
     """POST /admin/users/admins/ - Create a new admin user."""
@@ -207,6 +214,7 @@ def admin_user_create(request):
 
 
 @api_view(['PUT', 'PATCH'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def admin_user_update(request, pk):
     """PUT/PATCH /admin/users/admins/<pk>/ - Update an admin user."""
@@ -239,6 +247,7 @@ def admin_user_update(request, pk):
 
 
 @api_view(['DELETE'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def admin_user_delete(request, pk):
     """DELETE /admin/users/admins/<pk>/ - Delete an admin user."""
@@ -276,6 +285,7 @@ def admin_user_delete(request, pk):
 # ============================================================
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def settings_list(request):
     """GET /admin/settings/ - List current (active) game settings."""
@@ -296,6 +306,7 @@ def settings_list(request):
 
 
 @api_view(['POST'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def settings_create(request):
     """POST /admin/settings/ - Create a new setting (or new version of existing key)."""
@@ -333,6 +344,7 @@ def settings_create(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def settings_detail(request, pk):
     """GET /admin/settings/<pk>/ - Get a single setting."""
@@ -345,6 +357,7 @@ def settings_detail(request, pk):
 
 
 @api_view(['PUT', 'PATCH'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def settings_update(request, pk):
     """PUT/PATCH /admin/settings/<pk>/ - Update a setting."""
@@ -381,6 +394,7 @@ def settings_update(request, pk):
 # ============================================================
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def audit_log_list(request):
     """GET /admin/audit-log/ - List audit log entries with optional filters."""
@@ -424,6 +438,7 @@ def audit_log_list(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def audit_log_detail(request, pk):
     """GET /admin/audit-log/<pk>/ - Get a single audit log entry."""
@@ -443,6 +458,7 @@ def audit_log_detail(request, pk):
 # ============================================================
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def admin_auth_me(request):
     """

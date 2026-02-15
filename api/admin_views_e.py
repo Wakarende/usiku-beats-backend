@@ -9,7 +9,7 @@ Endpoints:
 - GET /admin/business/revenue/        - Revenue analytics
 - GET /admin/business/geography/      - Geographic distribution
 """
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from django.db.models import Count, Sum, Avg, Max, Min, Q, F
@@ -25,6 +25,7 @@ from .admin_utils import get_admin_user
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def business_overview(request):
     """
@@ -89,6 +90,7 @@ def business_overview(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def business_users(request):
     """
@@ -160,6 +162,7 @@ def business_users(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def business_content(request):
     """
@@ -234,6 +237,7 @@ def business_content(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def business_engagement(request):
     """
@@ -311,6 +315,7 @@ def business_engagement(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def business_revenue_analytics(request):
     """
@@ -387,6 +392,7 @@ def business_revenue_analytics(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def business_geography(request):
     """
