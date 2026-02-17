@@ -7,6 +7,7 @@ urlpatterns = [
 	path('song-list/', views.songList, name="song-list"),
     path('initial-song-list/', views.get_initial_songs, name="get-initial-songs"),
     path('songs/', views.get_songs_by_id, name="get-songs-by-id"),
+    path('library-songs/', views.library_songs, name="library-songs"),
 
 
     path('mdundo-song-list/', views.mdundoSongList, name="song-list"),

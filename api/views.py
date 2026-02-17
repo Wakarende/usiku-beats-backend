@@ -463,6 +463,13 @@ def get_initial_songs(request):
 
 
 @api_view(['GET'])
+def library_songs(request):
+    songs = Song.objects.filter(is_library=True, status='active').order_by('difficulty', 'song_name')
+    serializer = SongSerializer(songs, many=True, context={'request': request})
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
 def get_songs_by_id(request):
     ids = request.GET.getlist('ids')  # Retrieve list of IDs from the query parameters
 

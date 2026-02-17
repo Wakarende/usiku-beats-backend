@@ -310,6 +310,7 @@ class Song(models.Model):
     go_live_date = models.DateTimeField(blank=True, null=True)
     expiry_date = models.DateTimeField(blank=True, null=True)
     language = models.CharField(max_length=50, blank=True, null=True)
+    is_library = models.BooleanField(default=False)
 
     def __str__(self):
         return f'{self.artist_name} - {self.song_name} - {self.id}'
