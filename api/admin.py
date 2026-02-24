@@ -13,6 +13,13 @@ admin.site.register(PlayerSongInstance)
 admin.site.register(Tribe)
 admin.site.register(WebhookLog)
 admin.site.register(XsollaTransaction)
+admin.site.register(Label)
+admin.site.register(AdminUser)
+admin.site.register(GameSettings)
+admin.site.register(AuditLog)
+admin.site.register(PaymentStatus)
+admin.site.register(KickedPlayer)
+admin.site.register(ContentSuggestion)
 
 
 
