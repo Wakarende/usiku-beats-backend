@@ -2,8 +2,9 @@
 Serializers for the Admin Dashboard APIs.
 Phase A: Labels, Admin Users, Game Settings, Audit Log, Auth
 """
+from decimal import Decimal
 from rest_framework import serializers
-from .models import Label, AdminUser, GameSettings, AuditLog
+from .models import Label, AdminUser, GameSettings, AuditLog, CountryPricing
 
 
 # ============================================================
@@ -105,6 +106,54 @@ class AuditLogSerializer(serializers.ModelSerializer):
         fields = ['id', 'admin_email', 'action', 'entity_type', 'entity_id',
                   'changes', 'ip_address', 'created_at']
         read_only_fields = ['id', 'created_at']
+
+
+# ============================================================
+# COUNTRY PRICING SERIALIZERS
+# ============================================================
+
+class CountryPricingSerializer(serializers.ModelSerializer):
+    calculated_local_price = serializers.SerializerMethodField()
+    total_with_vat = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CountryPricing
+        fields = [
+            'id', 'country_code', 'country_name', 'currency_name', 'currency_code',
+            'vat_rate', 'exchange_rate', 'exchange_rate_updated_at',
+            'calculated_local_price', 'total_with_vat',
+            'final_price', 'notes', 'is_active', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_calculated_local_price(self, obj):
+        if obj.exchange_rate is None:
+            return None
+        usd_price = self.context.get('usd_price')
+        if usd_price is None:
+            return None
+        return str(round(usd_price * obj.exchange_rate, 2))
+
+    def get_total_with_vat(self, obj):
+        if obj.exchange_rate is None:
+            return None
+        usd_price = self.context.get('usd_price')
+        if usd_price is None:
+            return None
+        local_price = usd_price * obj.exchange_rate
+        return str(round(local_price * (1 + obj.vat_rate), 2))
+
+
+class CountryPricingUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CountryPricing
+        fields = ['final_price', 'vat_rate', 'notes', 'is_active']
+        extra_kwargs = {
+            'final_price': {'required': False},
+            'vat_rate': {'required': False},
+            'notes': {'required': False},
+            'is_active': {'required': False},
+        }
 
 
 # ============================================================

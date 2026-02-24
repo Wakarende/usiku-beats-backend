@@ -11,12 +11,15 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
-from .models import Label, AdminUser, GameSettings, AuditLog
+from decimal import Decimal
+
+from .models import Label, AdminUser, GameSettings, AuditLog, CountryPricing
 from .admin_serializers import (
     LabelSerializer, LabelCreateSerializer, LabelUpdateSerializer,
     AdminUserSerializer, AdminUserCreateSerializer, AdminUserUpdateSerializer,
     GameSettingsSerializer, GameSettingsCreateSerializer, GameSettingsUpdateSerializer,
     AuditLogSerializer,
+    CountryPricingSerializer, CountryPricingUpdateSerializer,
 )
 from .admin_utils import get_admin_user, log_audit, get_admin_permissions
 
@@ -387,6 +390,214 @@ def settings_update(request, pk):
     )
 
     return Response(GameSettingsSerializer(setting).data)
+
+
+# ============================================================
+# COUNTRY PRICING ENDPOINTS
+# ============================================================
+
+def _get_usd_price():
+    """Fetch the active price_per_bundle_usd setting from api_game_settings."""
+    setting = GameSettings.objects.filter(
+        key='price_per_bundle_usd', effective_to__isnull=True
+    ).first()
+    return Decimal(setting.value) if setting else None
+
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+def country_pricing_list(request):
+    """GET /admin/country-pricing/ - List all country pricing rows with computed fields."""
+    admin = get_admin_user(request)
+    if not admin:
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    rows = CountryPricing.objects.all().order_by('country_name')
+    usd_price = _get_usd_price()
+    serializer = CountryPricingSerializer(rows, many=True, context={'usd_price': usd_price})
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+def country_pricing_detail(request, pk):
+    """GET /admin/country-pricing/<pk>/ - Get a single country pricing row."""
+    admin = get_admin_user(request)
+    if not admin:
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    row = get_object_or_404(CountryPricing, pk=pk)
+    usd_price = _get_usd_price()
+    serializer = CountryPricingSerializer(row, context={'usd_price': usd_price})
+    return Response(serializer.data)
+
+
+@api_view(['PUT', 'PATCH'])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+def country_pricing_update(request, pk):
+    """PUT/PATCH /admin/country-pricing/<pk>/update/ - Update a country's pricing fields."""
+    admin = get_admin_user(request)
+    if not admin:
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if admin.role not in ('super_user', 'product_manager'):
+        return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
+
+    row = get_object_or_404(CountryPricing, pk=pk)
+    old_data = {
+        'final_price': str(row.final_price) if row.final_price is not None else None,
+        'vat_rate': str(row.vat_rate),
+        'notes': row.notes,
+        'is_active': row.is_active,
+    }
+
+    serializer = CountryPricingUpdateSerializer(row, data=request.data, partial=True)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    row = serializer.save(updated_by=admin)
+
+    log_audit(
+        admin_email=admin.google_email,
+        action='update',
+        entity_type='country_pricing',
+        entity_id=str(row.id),
+        changes={
+            'country_code': row.country_code,
+            'old': old_data,
+            'new': {
+                'final_price': str(row.final_price) if row.final_price is not None else None,
+                'vat_rate': str(row.vat_rate),
+                'notes': row.notes,
+                'is_active': row.is_active,
+            },
+        },
+        request=request,
+    )
+
+    usd_price = _get_usd_price()
+    return Response(CountryPricingSerializer(row, context={'usd_price': usd_price}).data)
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+def country_pricing_bulk_update_rates(request):
+    """
+    POST /admin/country-pricing/bulk-update-rates/
+    Bulk update exchange rates after a frontend fetch.
+    Body: [{"country_code": "NG", "exchange_rate": 1612.5}, ...]
+    """
+    admin = get_admin_user(request)
+    if not admin:
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if admin.role not in ('super_user', 'product_manager'):
+        return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
+
+    payload = request.data
+    if not isinstance(payload, list):
+        return Response(
+            {'error': 'Expected a list of {country_code, exchange_rate} objects'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    from decimal import InvalidOperation
+    updated = []
+    errors = []
+    now = timezone.now()
+
+    for item in payload:
+        code = item.get('country_code')
+        rate = item.get('exchange_rate')
+        if not code or rate is None:
+            errors.append({'country_code': code, 'error': 'country_code and exchange_rate are required'})
+            continue
+        try:
+            rate_decimal = Decimal(str(rate))
+        except InvalidOperation:
+            errors.append({'country_code': code, 'error': 'Invalid exchange_rate value'})
+            continue
+        try:
+            row = CountryPricing.objects.get(country_code=code)
+            row.exchange_rate = rate_decimal
+            row.exchange_rate_updated_at = now
+            row.updated_by = admin
+            row.save()
+            updated.append(code)
+        except CountryPricing.DoesNotExist:
+            errors.append({'country_code': code, 'error': 'Country not found'})
+
+    log_audit(
+        admin_email=admin.google_email,
+        action='bulk_update_rates',
+        entity_type='country_pricing',
+        changes={'countries_updated': len(updated), 'updated': updated, 'errors': errors},
+        request=request,
+    )
+
+    return Response({'updated': updated, 'errors': errors})
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+def country_pricing_save_final_prices(request):
+    """
+    POST /admin/country-pricing/save-final-prices/
+    Bulk save manually-entered final prices for multiple countries.
+    Body: [{"country_code": "NG", "final_price": 175.0}, ...]
+    """
+    admin = get_admin_user(request)
+    if not admin:
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if admin.role not in ('super_user', 'product_manager'):
+        return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
+
+    payload = request.data
+    if not isinstance(payload, list):
+        return Response(
+            {'error': 'Expected a list of {country_code, final_price} objects'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    from decimal import InvalidOperation
+    updated = []
+    errors = []
+
+    for item in payload:
+        code = item.get('country_code')
+        price = item.get('final_price')
+        if not code or price is None:
+            errors.append({'country_code': code, 'error': 'country_code and final_price are required'})
+            continue
+        try:
+            price_decimal = Decimal(str(price))
+        except InvalidOperation:
+            errors.append({'country_code': code, 'error': 'Invalid final_price value'})
+            continue
+        try:
+            row = CountryPricing.objects.get(country_code=code)
+            row.final_price = price_decimal
+            row.updated_by = admin
+            row.save()
+            updated.append({'country_code': code, 'final_price': str(price_decimal)})
+        except CountryPricing.DoesNotExist:
+            errors.append({'country_code': code, 'error': 'Country not found'})
+
+    log_audit(
+        admin_email=admin.google_email,
+        action='save_final_prices',
+        entity_type='country_pricing',
+        changes={'countries_updated': len(updated), 'prices': updated, 'errors': errors},
+        request=request,
+    )
+
+    return Response({'updated': updated, 'errors': errors})
 
 
 # ============================================================

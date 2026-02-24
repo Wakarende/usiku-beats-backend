@@ -2,7 +2,7 @@
 URL patterns for Admin Dashboard APIs.
 All endpoints are prefixed with /admin-api/ (configured in usiku_beats_api/urls.py).
 
-Total: 50 endpoints across 6 phases.
+Total: 55 endpoints across 6 phases + country pricing.
 """
 from django.urls import path
 from . import admin_views
@@ -40,6 +40,13 @@ urlpatterns = [
     # Audit Log (read-only)
     path('audit-log/', admin_views.audit_log_list, name='admin-audit-log-list'),
     path('audit-log/<int:pk>/', admin_views.audit_log_detail, name='admin-audit-log-detail'),
+
+    # Country Pricing
+    path('country-pricing/', admin_views.country_pricing_list, name='admin-country-pricing-list'),
+    path('country-pricing/bulk-update-rates/', admin_views.country_pricing_bulk_update_rates, name='admin-country-pricing-bulk-rates'),
+    path('country-pricing/save-final-prices/', admin_views.country_pricing_save_final_prices, name='admin-country-pricing-save-prices'),
+    path('country-pricing/<int:pk>/', admin_views.country_pricing_detail, name='admin-country-pricing-detail'),
+    path('country-pricing/<int:pk>/update/', admin_views.country_pricing_update, name='admin-country-pricing-update'),
 
     # ========== Phase B: User Management (6 endpoints) ==========
 

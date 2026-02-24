@@ -88,6 +88,31 @@ class AuditLog(models.Model):
         return f'{self.admin_email} - {self.action} {self.entity_type} - {self.created_at}'
 
 
+class CountryPricing(models.Model):
+    """Per-country pricing configuration for bundle sales."""
+    country_code = models.CharField(max_length=2, unique=True)
+    country_name = models.CharField(max_length=50)
+    currency_name = models.CharField(max_length=60)
+    currency_code = models.CharField(max_length=3)
+    vat_rate = models.DecimalField(max_digits=5, decimal_places=4)
+    exchange_rate = models.DecimalField(max_digits=14, decimal_places=6, null=True, blank=True)
+    exchange_rate_updated_at = models.DateTimeField(null=True, blank=True)
+    final_price = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    notes = models.TextField(default='', blank=True)
+    is_active = models.BooleanField(default=True)
+    updated_by = models.ForeignKey(AdminUser, on_delete=models.SET_NULL, null=True, blank=True, db_column='updated_by_id')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'api_country_pricing'
+        managed = False  # Table was created directly via psycopg2; Django manages queries only
+        ordering = ['country_name']
+
+    def __str__(self):
+        return f'{self.country_name} ({self.currency_code})'
+
+
 class PaymentStatus(models.Model):
     """Track payment processing status for payee payouts."""
     STATUS_CHOICES = (
