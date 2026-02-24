@@ -30,6 +30,12 @@ class SongSerializer(serializers.ModelSerializer):
         return obj.country.name if obj.country else None
 
 
+class GameSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GameSettings
+        fields = '__all__'
+
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User

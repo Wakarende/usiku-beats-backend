@@ -789,3 +789,15 @@ def create_xsolla_payment_token(request):
 
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+def get_game_settings(request):
+    now = timezone.now()
+    settings = GameSettings.objects.filter(
+        effective_from__lte=now
+    ).filter(
+        models.Q(effective_to__isnull=True) | models.Q(effective_to__gt=now)
+    )
+    serializer = GameSettingsSerializer(settings, many=True)
+    return Response(serializer.data)
