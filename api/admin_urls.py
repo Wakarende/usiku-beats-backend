@@ -11,6 +11,7 @@ from . import admin_views_c
 from . import admin_views_d
 from . import admin_views_e
 from . import admin_views_f
+from . import admin_views_g
 
 urlpatterns = [
     # ========== Phase A: Foundation (16 endpoints) ==========
@@ -98,4 +99,12 @@ urlpatterns = [
     path('suggestions/summary/', admin_views_f.suggestion_summary, name='admin-suggestion-summary'),
     path('suggestions/<int:pk>/status/', admin_views_f.suggestion_update_status, name='admin-suggestion-status'),
     path('suggestions/ingest/', admin_views_f.suggestion_ingest, name='admin-suggestion-ingest'),
+
+    # ========== Phase G: Country Pricing (5 endpoints) ==========
+
+    path("country-pricing/", admin_views_g.country_pricing_list, name="admin-country-pricing-list"),
+    path("country-pricing/<int:pk>/", admin_views_g.country_pricing_detail, name="admin-country-pricing-detail"),
+    path("country-pricing/<int:pk>/update/", admin_views_g.country_pricing_update, name="admin-country-pricing-update"),
+    path("country-pricing/bulk-update-rates/", admin_views_g.country_pricing_bulk_update_rates, name="admin-country-pricing-bulk-rates"),
+    path("country-pricing/save-final-prices/", admin_views_g.country_pricing_save_final_prices, name="admin-country-pricing-save-prices"),
 ]

@@ -483,3 +483,28 @@ class XsollaTransaction(models.Model):
     class Meta:
         verbose_name_plural = 'Xsolla Transactions'
         ordering = ['-created_at']
+
+
+class CountryPricing(models.Model):
+    country_code = models.CharField(max_length=10, unique=True)
+    country_name = models.CharField(max_length=100)
+    currency_name = models.CharField(max_length=100)
+    currency_code = models.CharField(max_length=10)
+    vat_rate = models.DecimalField(max_digits=6, decimal_places=4)
+    exchange_rate = models.DecimalField(max_digits=15, decimal_places=6, null=True, blank=True)
+    exchange_rate_updated_at = models.DateTimeField(null=True, blank=True)
+    final_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    notes = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    updated_by = models.ForeignKey(
+        'AdminUser', on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'api_country_pricing'
+        ordering = ['id']
+
+    def __str__(self):
+        return f'{self.country_name} ({self.currency_code})'
