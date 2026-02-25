@@ -7,13 +7,17 @@ Endpoints:
 - GET    /admin/songs/<pk>/             - Song detail with play stats
 - PUT    /admin/songs/<pk>/update/      - Update a song
 - DELETE /admin/songs/<pk>/delete/      - Delete a song (set inactive)
+- POST   /admin/songs/<pk>/upload-file/ - Upload a file to a song
 - GET    /admin/artists/                - List artists with stats, search, filter
 - POST   /admin/artists/create/         - Create a new artist
 - GET    /admin/artists/<pk>/           - Artist detail with songs and stats
 - PUT    /admin/artists/<pk>/update/    - Update an artist
 - DELETE /admin/artists/<pk>/delete/    - Delete an artist
+- GET    /admin/countries/              - List all countries
+- GET    /admin/genres/                 - List all genres
 """
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework import status, permissions
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -162,6 +166,7 @@ def song_create(request):
         status=data.get('status', 'active'),
         platform=data.get('platform', 'usiku'),
         promoted=data.get('promoted', False),
+        is_library=data.get('is_library', False),
         language=data.get('language'),
         go_live_date=data.get('go_live_date'),
         expiry_date=data.get('expiry_date'),
@@ -244,6 +249,7 @@ def song_detail(request, pk):
             'name': song.artist.name,
             'label': song.artist.label.name if song.artist.label else None,
         } if song.artist else None,
+        'label': song.artist.label.name if song.artist and song.artist.label else None,
         'genre': {'id': song.genre.id, 'name': song.genre.name} if song.genre else None,
         'country': {'id': song.country.id, 'name': song.country.name} if song.country else None,
         'tribe': {'id': song.tribe.id, 'name': song.tribe.name} if song.tribe else None,
@@ -251,6 +257,7 @@ def song_detail(request, pk):
         'status': song.status,
         'platform': song.platform,
         'promoted': song.promoted,
+        'is_library': song.is_library,
         'language': song.language,
         'date_added': song.date_added.isoformat(),
         'go_live_date': song.go_live_date.isoformat() if song.go_live_date else None,
@@ -259,6 +266,10 @@ def song_detail(request, pk):
         'midi_url': song.midi_url,
         'mp3_clip_url': song.mp3_clip_url,
         'thumbnail_url': song.thumbnail_url,
+        'mp3_file': song.mp3_file.url if song.mp3_file else None,
+        'midi_file': song.midi_file.url if song.midi_file else None,
+        'mp3_clip_file': song.mp3_clip_file.url if song.mp3_clip_file else None,
+        'thumbnail_file': song.thumbnail_file.url if song.thumbnail_file else None,
         'data': song.data,
         'stats': {
             'total_plays': play_stats['total_plays'] or 0,
@@ -292,7 +303,7 @@ def song_update(request, pk):
 
     # Update simple fields
     simple_fields = ['song_name', 'artist_name', 'difficulty', 'status', 'platform',
-                     'promoted', 'language', 'go_live_date', 'expiry_date',
+                     'promoted', 'is_library', 'language', 'go_live_date', 'expiry_date',
                      'mp3_url', 'midi_url', 'mp3_clip_url', 'thumbnail_url']
     for field in simple_fields:
         if field in data:
@@ -629,3 +640,104 @@ def artist_delete(request, pk):
         'message': f'Artist "{artist_name}" deleted. {affected_songs} songs now unlinked.',
         'id': artist_id,
     })
+
+
+# ============================================================
+# SONG FILE UPLOAD
+# ============================================================
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+@parser_classes([MultiPartParser, FormParser])
+def song_upload_file(request, pk):
+    """
+    POST /admin/songs/<pk>/upload-file/
+    Upload a file (mp3, midi, mp3_clip, thumbnail) to a song.
+    """
+    admin = get_admin_user(request)
+    if not admin:
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if admin.role not in ('super_user', 'product_manager', 'content_editor'):
+        return Response({'error': 'Insufficient permissions'}, status=status.HTTP_403_FORBIDDEN)
+
+    song = get_object_or_404(Song, pk=pk)
+
+    uploaded_file = request.FILES.get('file')
+    field = request.data.get('field', '').strip()
+
+    if not uploaded_file:
+        return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+    field_map = {
+        'mp3': 'mp3_file',
+        'midi': 'midi_file',
+        'mp3_clip': 'mp3_clip_file',
+        'thumbnail': 'thumbnail_file',
+    }
+
+    if field not in field_map:
+        return Response(
+            {'error': f'Invalid field "{field}". Must be one of: {", ".join(field_map.keys())}'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    model_field = field_map[field]
+
+    # Save the file to the model's FileField
+    getattr(song, model_field).save(uploaded_file.name, uploaded_file, save=True)
+
+    file_url = getattr(song, model_field).url
+
+    log_audit(
+        admin_email=admin.google_email,
+        action='upload',
+        entity_type='song',
+        entity_id=str(song.id),
+        changes={'field': model_field, 'filename': uploaded_file.name},
+        request=request,
+    )
+
+    return Response({
+        'url': file_url,
+        'field': model_field,
+        'filename': uploaded_file.name,
+        'message': f'{field} file uploaded successfully',
+    })
+
+
+# ============================================================
+# REFERENCE DATA ENDPOINTS
+# ============================================================
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+def country_list(request):
+    """
+    GET /admin/countries/
+    List all countries for dropdown selectors.
+    """
+    admin = get_admin_user(request)
+    if not admin:
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    countries = Country.objects.all().order_by('name')
+    return Response([{'id': c.id, 'name': c.name} for c in countries])
+
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+def genre_list(request):
+    """
+    GET /admin/genres/
+    List all genres for dropdown selectors.
+    """
+    admin = get_admin_user(request)
+    if not admin:
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    genres = Genre.objects.all().order_by('name')
+    return Response([{'id': g.id, 'name': g.name} for g in genres])

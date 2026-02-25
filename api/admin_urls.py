@@ -66,6 +66,11 @@ urlpatterns = [
     path('songs/<int:pk>/', admin_views_c.song_detail, name='admin-song-detail'),
     path('songs/<int:pk>/update/', admin_views_c.song_update, name='admin-song-update'),
     path('songs/<int:pk>/delete/', admin_views_c.song_delete, name='admin-song-delete'),
+    path('songs/<int:pk>/upload-file/', admin_views_c.song_upload_file, name='admin-song-upload-file'),
+
+    # Reference data
+    path('countries/', admin_views_c.country_list, name='admin-country-list'),
+    path('genres/', admin_views_c.genre_list, name='admin-genre-list'),
 
     # Artists CRUD
     path('artists/', admin_views_c.artist_list, name='admin-artist-list'),
