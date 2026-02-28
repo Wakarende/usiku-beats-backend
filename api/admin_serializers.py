@@ -4,7 +4,7 @@ Phase A: Labels, Admin Users, Game Settings, Audit Log, Auth
 """
 from decimal import Decimal
 from rest_framework import serializers
-from .models import Label, AdminUser, GameSettings, AuditLog, CountryPricing
+from .models import Label, AdminUser, GameSettings, AuditLog, CountryPricing, LuckySpinPrize
 
 
 # ============================================================
@@ -168,3 +168,20 @@ class AdminMeSerializer(serializers.Serializer):
     role = serializers.CharField()
     status = serializers.CharField()
     permissions = serializers.ListField(child=serializers.CharField())
+
+
+# ============================================================
+# LUCKY SPIN SERIALIZERS
+# ============================================================
+
+class LuckySpinPrizeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LuckySpinPrize
+        fields = ['id', 'prize_number', 'label', 'quantity', 'type']
+        read_only_fields = ['id', 'prize_number']
+
+
+class LuckySpinPrizeUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LuckySpinPrize
+        fields = ['label', 'quantity', 'type']

@@ -508,3 +508,25 @@ class CountryPricing(models.Model):
 
     def __str__(self):
         return f'{self.country_name} ({self.currency_code})'
+
+
+class LuckySpinPrize(models.Model):
+    """Lucky Spin wheel prize configuration (10 slots)."""
+    TYPE_CHOICES = (
+        ('gems', 'Gems'),
+        ('discs', 'Discs'),
+        ('free_songs', 'Free Songs'),
+    )
+
+    prize_number = models.IntegerField(unique=True)
+    label = models.CharField(max_length=100, default='')
+    quantity = models.IntegerField(default=0)
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='gems')
+
+    class Meta:
+        managed = False
+        db_table = 'api_lucky_spin_prize'
+        ordering = ['prize_number']
+
+    def __str__(self):
+        return f'Prize {self.prize_number}: {self.label} ({self.quantity} {self.type})'

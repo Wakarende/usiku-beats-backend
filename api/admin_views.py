@@ -13,13 +13,14 @@ from django.utils import timezone
 
 from decimal import Decimal
 
-from .models import Label, AdminUser, GameSettings, AuditLog, CountryPricing
+from .models import Label, AdminUser, GameSettings, AuditLog, CountryPricing, LuckySpinPrize
 from .admin_serializers import (
     LabelSerializer, LabelCreateSerializer, LabelUpdateSerializer,
     AdminUserSerializer, AdminUserCreateSerializer, AdminUserUpdateSerializer,
     GameSettingsSerializer, GameSettingsCreateSerializer, GameSettingsUpdateSerializer,
     AuditLogSerializer,
     CountryPricingSerializer, CountryPricingUpdateSerializer,
+    LuckySpinPrizeSerializer, LuckySpinPrizeUpdateSerializer,
 )
 from .admin_utils import get_admin_user, log_audit, get_admin_permissions
 
@@ -691,3 +692,61 @@ def admin_auth_me(request):
         'status': admin.status,
         'permissions': perms,
     })
+
+
+# ============================================================
+# LUCKY SPIN ENDPOINTS
+# ============================================================
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+def lucky_spin_list(request):
+    """GET /admin-api/lucky-spin/ — list all 10 prizes (read-only)."""
+    admin = get_admin_user(request)
+    if not admin:
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    prizes = LuckySpinPrize.objects.all()
+    serializer = LuckySpinPrizeSerializer(prizes, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['PUT'])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+def lucky_spin_bulk_update(request):
+    """PUT /admin-api/lucky-spin/bulk-update/ — save all prizes at once.
+
+    Expects: { "prizes": [ { "prize_number": 1, "label": "...", "quantity": 10, "type": "gems" }, ... ] }
+    """
+    admin = get_admin_user(request)
+    if not admin:
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if admin.role != 'super_user':
+        return Response({'error': 'Forbidden: super_user role required'}, status=status.HTTP_403_FORBIDDEN)
+
+    prizes_data = request.data.get('prizes', [])
+    if not isinstance(prizes_data, list):
+        return Response({'error': 'prizes must be a list'}, status=status.HTTP_400_BAD_REQUEST)
+
+    updated = []
+    for item in prizes_data:
+        prize_number = item.get('prize_number')
+        if prize_number is None:
+            continue
+        try:
+            prize = LuckySpinPrize.objects.get(prize_number=prize_number)
+        except LuckySpinPrize.DoesNotExist:
+            continue
+
+        serializer = LuckySpinPrizeUpdateSerializer(prize, data=item, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            updated.append(serializer.data)
+
+    log_audit(admin.google_email, 'bulk_update', 'lucky_spin_prize', changes={'updated_count': len(updated)})
+
+    all_prizes = LuckySpinPrize.objects.all()
+    return Response(LuckySpinPrizeSerializer(all_prizes, many=True).data)

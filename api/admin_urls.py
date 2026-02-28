@@ -112,4 +112,9 @@ urlpatterns = [
     path("country-pricing/<int:pk>/update/", admin_views_g.country_pricing_update, name="admin-country-pricing-update"),
     path("country-pricing/bulk-update-rates/", admin_views_g.country_pricing_bulk_update_rates, name="admin-country-pricing-bulk-rates"),
     path("country-pricing/save-final-prices/", admin_views_g.country_pricing_save_final_prices, name="admin-country-pricing-save-prices"),
+
+    # ========== Lucky Spin (2 endpoints) ==========
+
+    path('lucky-spin/', admin_views.lucky_spin_list, name='admin-lucky-spin-list'),
+    path('lucky-spin/bulk-update/', admin_views.lucky_spin_bulk_update, name='admin-lucky-spin-bulk-update'),
 ]
