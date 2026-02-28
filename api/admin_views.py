@@ -702,11 +702,7 @@ def admin_auth_me(request):
 @authentication_classes([])
 @permission_classes([permissions.AllowAny])
 def lucky_spin_list(request):
-    """GET /admin-api/lucky-spin/ — list all 10 prizes (read-only)."""
-    admin = get_admin_user(request)
-    if not admin:
-        return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
-
+    """GET /admin-api/lucky-spin/ — list all 10 prizes (public, read-only)."""
     prizes = LuckySpinPrize.objects.all()
     serializer = LuckySpinPrizeSerializer(prizes, many=True)
     return Response(serializer.data)
