@@ -1,4 +1,5 @@
 from decimal import Decimal, InvalidOperation
+import logging
 from django.utils import timezone
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework import status, permissions
@@ -7,8 +8,11 @@ from django.shortcuts import get_object_or_404
 
 from .models import CountryPricing, GameSettings
 from .admin_utils import get_admin_user, log_audit
+from .xsolla_catalog import get_xsolla_item, sync_prices_to_xsolla
+from .constants import XSOLLA_ITEM_SKU, XSOLLA_PROJECT_ID
 
 WRITE_ROLES = ("super_user", "product_manager")
+logger = logging.getLogger(__name__)
 
 
 def _get_bundle_usd_price():
@@ -110,6 +114,31 @@ def country_pricing_update(request, pk):
 
     row.updated_by = admin
     row.save()
+    xsolla_synced = False
+    xsolla_sync_error = None
+    if row.final_price is not None and row.is_active:
+        try:
+            sync_result = sync_prices_to_xsolla()
+            xsolla_synced = bool(sync_result.get("success"))
+            if not xsolla_synced:
+                xsolla_sync_error = sync_result
+                logger.error(
+                    "Xsolla sync failed after country_pricing_update for country=%s: %s",
+                    row.country_code,
+                    sync_result,
+                )
+            else:
+                logger.info(
+                    "Xsolla sync succeeded after country_pricing_update for country=%s",
+                    row.country_code,
+                )
+        except Exception as exc:
+            xsolla_sync_error = str(exc)
+            logger.exception(
+                "Unexpected Xsolla sync exception after country_pricing_update for country=%s: %s",
+                row.country_code,
+                exc,
+            )
 
     log_audit(
         admin_email=admin.google_email,
@@ -121,7 +150,10 @@ def country_pricing_update(request, pk):
     )
 
     usd_price = _get_bundle_usd_price()
-    return Response(_serialize(row, usd_price))
+    data = _serialize(row, usd_price)
+    data["xsolla_synced"] = xsolla_synced
+    data["xsolla_sync_error"] = xsolla_sync_error
+    return Response(data)
 
 
 @api_view(["POST"])
@@ -215,4 +247,75 @@ def country_pricing_save_final_prices(request):
         request=request,
     )
 
-    return Response({"updated": updated, "errors": errors})
+    xsolla_synced = False
+    xsolla_sync_error = None
+    if updated > 0:
+        try:
+            sync_result = sync_prices_to_xsolla()
+            xsolla_synced = bool(sync_result.get("success"))
+            if not xsolla_synced:
+                xsolla_sync_error = sync_result
+                logger.error(
+                    "Xsolla sync failed after country_pricing_save_final_prices: %s",
+                    sync_result,
+                )
+            else:
+                logger.info(
+                    "Xsolla sync succeeded after country_pricing_save_final_prices with updated=%s",
+                    updated,
+                )
+        except Exception as exc:
+            xsolla_sync_error = str(exc)
+            logger.exception(
+                "Unexpected Xsolla sync exception after country_pricing_save_final_prices: %s",
+                exc,
+            )
+
+    return Response({"updated": updated, "errors": errors, "xsolla_synced": xsolla_synced, "xsolla_sync_error": xsolla_sync_error})
+
+
+@api_view(["GET", "POST"])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+def xsolla_sync_debug(request):
+    """
+    Debug endpoint to inspect and test the Xsolla catalog sync.
+
+    GET  — Fetches the raw virtual item from Xsolla so you can see its current
+            state (prices, structure) and confirm the endpoint/auth are working.
+
+    POST — Runs the full sync (same code path as Save Final Prices) and returns
+            every detail including the raw Xsolla PUT response body so you can
+            see exactly what succeeded or failed.
+    """
+    admin = get_admin_user(request)
+    if not admin:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    endpoint_url = (
+        f"https://store.xsolla.com/api/v2/project/{XSOLLA_PROJECT_ID}"
+        f"/admin/items/virtual_items/sku/{XSOLLA_ITEM_SKU}"
+    )
+
+    if request.method == "GET":
+        item_result = get_xsolla_item()
+        return Response({
+            "sku": XSOLLA_ITEM_SKU,
+            "project_id": XSOLLA_PROJECT_ID,
+            "endpoint": endpoint_url,
+            "xsolla_get_success": item_result.get("success"),
+            "xsolla_item": item_result.get("item"),
+            "xsolla_error": item_result.get("error"),
+            "xsolla_status_code": item_result.get("status_code"),
+            "stage": item_result.get("stage"),
+        })
+
+    # POST — run the full sync and surface every detail
+    sync_result = sync_prices_to_xsolla()
+    return Response({
+        "sku": XSOLLA_ITEM_SKU,
+        "project_id": XSOLLA_PROJECT_ID,
+        "endpoint": endpoint_url,
+        "sync_success": sync_result.get("success"),
+        "sync_detail": sync_result,
+    })

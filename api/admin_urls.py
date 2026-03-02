@@ -43,11 +43,12 @@ urlpatterns = [
     path('audit-log/<int:pk>/', admin_views.audit_log_detail, name='admin-audit-log-detail'),
 
     # Country Pricing
-    path('country-pricing/', admin_views.country_pricing_list, name='admin-country-pricing-list'),
-    path('country-pricing/bulk-update-rates/', admin_views.country_pricing_bulk_update_rates, name='admin-country-pricing-bulk-rates'),
-    path('country-pricing/save-final-prices/', admin_views.country_pricing_save_final_prices, name='admin-country-pricing-save-prices'),
-    path('country-pricing/<int:pk>/', admin_views.country_pricing_detail, name='admin-country-pricing-detail'),
-    path('country-pricing/<int:pk>/update/', admin_views.country_pricing_update, name='admin-country-pricing-update'),
+    path('country-pricing/', admin_views_g.country_pricing_list, name='admin-country-pricing-list'),
+    path('country-pricing/bulk-update-rates/', admin_views_g.country_pricing_bulk_update_rates, name='admin-country-pricing-bulk-rates'),
+    path('country-pricing/save-final-prices/', admin_views_g.country_pricing_save_final_prices, name='admin-country-pricing-save-prices'),
+    path('country-pricing/<int:pk>/', admin_views_g.country_pricing_detail, name='admin-country-pricing-detail'),
+    path('country-pricing/<int:pk>/update/', admin_views_g.country_pricing_update, name='admin-country-pricing-update'),
+    path('country-pricing/xsolla-debug/', admin_views_g.xsolla_sync_debug, name='admin-xsolla-sync-debug'),
 
     # ========== Phase B: User Management (6 endpoints) ==========
 
@@ -104,14 +105,6 @@ urlpatterns = [
     path('suggestions/summary/', admin_views_f.suggestion_summary, name='admin-suggestion-summary'),
     path('suggestions/<int:pk>/status/', admin_views_f.suggestion_update_status, name='admin-suggestion-status'),
     path('suggestions/ingest/', admin_views_f.suggestion_ingest, name='admin-suggestion-ingest'),
-
-    # ========== Phase G: Country Pricing (5 endpoints) ==========
-
-    path("country-pricing/", admin_views_g.country_pricing_list, name="admin-country-pricing-list"),
-    path("country-pricing/<int:pk>/", admin_views_g.country_pricing_detail, name="admin-country-pricing-detail"),
-    path("country-pricing/<int:pk>/update/", admin_views_g.country_pricing_update, name="admin-country-pricing-update"),
-    path("country-pricing/bulk-update-rates/", admin_views_g.country_pricing_bulk_update_rates, name="admin-country-pricing-bulk-rates"),
-    path("country-pricing/save-final-prices/", admin_views_g.country_pricing_save_final_prices, name="admin-country-pricing-save-prices"),
 
     # ========== Lucky Spin (2 endpoints) ==========
 

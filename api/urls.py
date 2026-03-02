@@ -41,6 +41,7 @@ urlpatterns = [
     # Xsolla
     path('webhooks/xsolla/', views.xsolla_webhook, name='xsolla-webhook'),
     path('payment/create-token/', views.create_xsolla_payment_token, name='create-xsolla-payment-token'),
+    path('pricing/', views.get_country_pricing, name='country-pricing'),
 
     path('game-settings/', views.get_game_settings, name='game-settings'),
 ]

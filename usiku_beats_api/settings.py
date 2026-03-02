@@ -167,6 +167,11 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
+# GeoIP database file path (GeoLite2-Country.mmdb).
+# Download from https://dev.maxmind.com/geoip/geolite2-free-geolocation-data
+# (free MaxMind account required), then place the file at this location.
+GEOIP_PATH = os.path.join(BASE_DIR, 'geoip', 'GeoLite2-Country.mmdb')
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 

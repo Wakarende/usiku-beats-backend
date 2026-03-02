@@ -9,6 +9,9 @@ XSOLLA_PROJECT_ID = "292524"
 XSOLLA_MERCHANT_ID = "836727"
 XSOLLA_API_KEY = "REMOVED_SECRET"
 
+# The SKU of the purchasable item in Xsolla's catalog
+XSOLLA_ITEM_SKU = 'bundle_starter'
+
 # SKU to rewards mapping
 # Maps Xsolla product SKUs to the virtual currency rewards
 XSOLLA_SKU_REWARDS = {

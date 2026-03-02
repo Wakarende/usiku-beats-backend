@@ -6,6 +6,7 @@ from .serializers import *
 from django.shortcuts import get_object_or_404
 from django.db.models import Count
 from django.core.paginator import Paginator
+from django.conf import settings
 import random
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -15,6 +16,7 @@ from django.contrib.auth import login as auth_login
 from django.utils import timezone
 import requests as http_requests
 from decimal import Decimal
+import logging
 from .utils import verify_xsolla_signature
 from .constants import (
     XSOLLA_SKU_REWARDS,
@@ -23,6 +25,9 @@ from .constants import (
     XSOLLA_API_KEY,
 )
 import base64
+
+
+logger = logging.getLogger(__name__)
 
 @api_view(['GET'])
 def apiOverview(request):
@@ -789,6 +794,64 @@ def create_xsolla_payment_token(request):
 
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+def get_country_pricing(request):
+    ip_address = get_ip_address_from_request(request)
+    country_code = None
+
+    geoip_path = getattr(settings, "GEOIP_PATH", None)
+    if ip_address and geoip_path:
+        try:
+            import geoip2.database
+            from geoip2.errors import AddressNotFoundError
+
+            with geoip2.database.Reader(geoip_path) as reader:
+                geo_response = reader.country(ip_address)
+                country_code = (geo_response.country.iso_code or "").upper() or None
+        except AddressNotFoundError:
+            logger.info("GeoIP country not found for ip=%s", ip_address)
+        except FileNotFoundError:
+            logger.error("GeoIP database not found at GEOIP_PATH=%s", geoip_path)
+        except ValueError as exc:
+            logger.warning("Invalid IP for GeoIP lookup ip=%s error=%s", ip_address, exc)
+        except Exception as exc:
+            logger.exception("GeoIP lookup failed for ip=%s: %s", ip_address, exc)
+    elif not geoip_path:
+        logger.warning("GEOIP_PATH is not configured. Falling back to USD pricing.")
+
+    if country_code:
+        row = CountryPricing.objects.filter(
+            country_code__iexact=country_code,
+            is_active=True,
+            final_price__isnull=False,
+        ).first()
+        if row:
+            return Response({
+                "country_code": row.country_code,
+                "currency_code": row.currency_code,
+                "final_price": str(row.final_price),
+                "country_name": row.country_name,
+            })
+
+    try:
+        setting = GameSettings.objects.filter(
+            key="price_per_bundle_usd",
+            effective_to__isnull=True,
+        ).latest("effective_from")
+        fallback_price = Decimal(setting.value)
+    except Exception:
+        fallback_price = Decimal("0.10")
+
+    return Response({
+        "country_code": country_code or "US",
+        "currency_code": "USD",
+        "final_price": str(fallback_price),
+        "country_name": "United States",
+    })
 
 
 @api_view(['GET'])
