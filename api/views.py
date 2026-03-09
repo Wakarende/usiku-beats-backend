@@ -807,12 +807,13 @@ def get_country_pricing(request):
     if ip_address and geoip_path:
         try:
             import geoip2.database
-            from geoip2.errors import AddressNotFoundError
-
+            import geoip2.errors
             with geoip2.database.Reader(geoip_path) as reader:
                 geo_response = reader.country(ip_address)
                 country_code = (geo_response.country.iso_code or "").upper() or None
-        except AddressNotFoundError:
+        except ImportError:
+            logger.warning("geoip2 not installed. Falling back to USD pricing.")
+        except geoip2.errors.AddressNotFoundError:
             logger.info("GeoIP country not found for ip=%s", ip_address)
         except FileNotFoundError:
             logger.error("GeoIP database not found at GEOIP_PATH=%s", geoip_path)
