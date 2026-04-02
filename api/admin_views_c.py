@@ -189,6 +189,10 @@ def song_create(request):
     if tribe_id:
         song.tribe = Tribe.objects.filter(id=tribe_id).first()
 
+    label_id = data.get('label_id')
+    if label_id:
+        song.label = Label.objects.filter(id=label_id).first()
+
     # URLs
     song.mp3_url = data.get('mp3_url')
     song.midi_url = data.get('midi_url')
@@ -228,7 +232,7 @@ def song_detail(request, pk):
         return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
 
     song = get_object_or_404(
-        Song.objects.select_related('artist', 'artist__label', 'genre', 'country', 'tribe'),
+        Song.objects.select_related('artist', 'artist__label', 'label', 'genre', 'country', 'tribe'),
         pk=pk
     )
 
@@ -249,7 +253,12 @@ def song_detail(request, pk):
             'name': song.artist.name,
             'label': song.artist.label.name if song.artist.label else None,
         } if song.artist else None,
-        'label': song.artist.label.name if song.artist and song.artist.label else None,
+        'label': (
+            {'id': song.label.id, 'name': song.label.name}
+            if song.label else
+            {'id': song.artist.label.id, 'name': song.artist.label.name}
+            if song.artist and song.artist.label else None
+        ),
         'genre': {'id': song.genre.id, 'name': song.genre.name} if song.genre else None,
         'country': {'id': song.country.id, 'name': song.country.name} if song.country else None,
         'tribe': {'id': song.tribe.id, 'name': song.tribe.name} if song.tribe else None,
@@ -318,6 +327,9 @@ def song_update(request, pk):
         song.country = Country.objects.filter(id=data['country_id']).first()
     if 'tribe_id' in data:
         song.tribe = Tribe.objects.filter(id=data['tribe_id']).first()
+    if 'label_id' in data:
+        lbl_id = data['label_id']
+        song.label = Label.objects.filter(id=lbl_id).first() if lbl_id else None
 
     song.save()
 

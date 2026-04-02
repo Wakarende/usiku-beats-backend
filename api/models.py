@@ -331,6 +331,7 @@ class Song(models.Model):
     data = models.JSONField(blank=True, null=True)
 
     # New fields (admin dashboard)
+    label = models.ForeignKey(Label, on_delete=models.SET_NULL, blank=True, null=True, related_name='songs')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name='created_songs')
     go_live_date = models.DateTimeField(blank=True, null=True)
     expiry_date = models.DateTimeField(blank=True, null=True)
