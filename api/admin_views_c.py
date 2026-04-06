@@ -53,7 +53,7 @@ def song_list(request):
     if not admin:
         return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
 
-    songs = Song.objects.select_related('artist', 'artist__label', 'genre', 'country', 'tribe').all()
+    songs = Song.objects.select_related('artist', 'artist__label', 'label', 'genre', 'country', 'tribe').all()
 
     # Search
     search = request.GET.get('search', '').strip()
@@ -111,7 +111,7 @@ def song_list(request):
             'song_name': song.song_name,
             'artist_name': song.artist_name,
             'artist_id': song.artist_id,
-            'label': song.artist.label.name if song.artist and song.artist.label else None,
+            'label': song.label.name if song.label else (song.artist.label.name if song.artist and song.artist.label else None),
             'genre': song.genre.name if song.genre else None,
             'country': song.country.name if song.country else None,
             'difficulty': song.difficulty,
