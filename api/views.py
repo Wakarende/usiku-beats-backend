@@ -767,7 +767,10 @@ def create_xsolla_payment_token(request):
                 },
                 'sandbox': sandbox,
                 'settings': {
-                    'return_url': return_url
+                    'return_url': return_url,
+                    'ui': {
+                        'theme': '69d4dbe4cfccf0231bab844c'
+                    }
                 }
             }
         )
