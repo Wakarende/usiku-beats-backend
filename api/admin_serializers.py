@@ -46,8 +46,8 @@ class LabelUpdateSerializer(serializers.ModelSerializer):
 class AdminUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = AdminUser
-        fields = ['id', 'google_email', 'display_name', 'role', 'status', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = ['id', 'google_email', 'display_name', 'role', 'status', 'created_at', 'last_login']
+        read_only_fields = ['id', 'created_at', 'last_login']
 
 
 class AdminUserCreateSerializer(serializers.ModelSerializer):

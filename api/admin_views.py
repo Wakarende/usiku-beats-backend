@@ -682,6 +682,9 @@ def admin_auth_me(request):
     if not admin:
         return Response({'error': 'Unauthorized'}, status=status.HTTP_401_UNAUTHORIZED)
 
+    # Stamp last_login on every verification call (invoked on sign-in).
+    AdminUser.objects.filter(pk=admin.pk).update(last_login=timezone.now())
+
     perms = get_admin_permissions(admin.role)
 
     return Response({
