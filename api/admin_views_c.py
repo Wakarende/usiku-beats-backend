@@ -91,7 +91,7 @@ def song_list(request):
 
     # Pagination
     page = max(int(request.GET.get('page', 1)), 1)
-    page_size = min(int(request.GET.get('page_size', 20)), 100)
+    page_size = min(int(request.GET.get('page_size', 20)), 1000)
     total = songs.count()
     start = (page - 1) * page_size
     end = start + page_size
@@ -423,7 +423,7 @@ def artist_list(request):
 
     # Pagination
     page = max(int(request.GET.get('page', 1)), 1)
-    page_size = min(int(request.GET.get('page_size', 20)), 100)
+    page_size = min(int(request.GET.get('page_size', 20)), 1000)
     total = artists.count()
     start = (page - 1) * page_size
     end = start + page_size

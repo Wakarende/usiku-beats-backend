@@ -70,7 +70,7 @@ def user_list(request):
 
     # Pagination
     page = max(int(request.GET.get('page', 1)), 1)
-    page_size = min(int(request.GET.get('page_size', 20)), 100)
+    page_size = min(int(request.GET.get('page_size', 20)), 1000)
     total = players.count()
     start = (page - 1) * page_size
     end = start + page_size
