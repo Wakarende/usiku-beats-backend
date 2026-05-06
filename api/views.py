@@ -191,7 +191,7 @@ def signup(request):
     user = User.objects.create_user(
         username=username, password=password, email=email)
     profile = Profile.objects.create(user=user, recent_ip_address=ip_address)
-    player = Player.object.create(profile=profile)
+    player = Player.objects.create(profile=profile)
 
 
     # auth_login(request._request, user)

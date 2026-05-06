@@ -9,11 +9,18 @@ class ArtistSerializer(serializers.ModelSerializer):
         exclude = ('mpesa_number','preferred_payout_method','revenue_earned','current_balance')
 
 
+class GenreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Genre
+        fields = ['name']
+
+
 class SongSerializer(serializers.ModelSerializer):
     
     country_code = serializers.SerializerMethodField()
     country_name = serializers.SerializerMethodField()
     artist = ArtistSerializer(read_only=True)
+    genre = GenreSerializer(read_only=True)
 
 
     class Meta:

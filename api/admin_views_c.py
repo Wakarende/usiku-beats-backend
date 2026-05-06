@@ -311,7 +311,7 @@ def song_update(request, pk):
     old_data = {'song_name': song.song_name, 'status': song.status}
 
     # Update simple fields
-    simple_fields = ['song_name', 'artist_name', 'difficulty', 'status', 'platform',
+    simple_fields = ['song_name', 'artist_name', 'difficulty', 'status', 'platform', 'data',
                      'promoted', 'is_library', 'language', 'go_live_date', 'expiry_date',
                      'mp3_url', 'midi_url', 'mp3_clip_url', 'thumbnail_url']
     for field in simple_fields:
