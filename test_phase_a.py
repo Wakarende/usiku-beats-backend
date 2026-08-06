@@ -171,14 +171,15 @@ def test_imports():
 
 def test_database_directly():
     """Test the database tables directly via psycopg2 to verify Phase A data."""
+    import os
     import psycopg2
 
     DB_CONFIG = {
-        'dbname': 'usiku_beats_database',
-        'user': 'cleve',
-        'password': 'REMOVED_SECRET',
-        'host': '13.36.182.150',
-        'port': '5432',
+        'dbname': os.environ.get('DB_NAME', 'usiku_beats_database'),
+        'user': os.environ.get('DB_USER', 'postgres'),
+        'password': os.environ.get('DB_PASSWORD', ''),
+        'host': os.environ.get('DB_HOST', 'localhost'),
+        'port': os.environ.get('DB_PORT', '5432'),
     }
 
     print("\n" + "=" * 60)

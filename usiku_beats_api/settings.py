@@ -17,12 +17,26 @@ from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load environment variables from a .env file when present (local dev / server).
+# In production, set these as real environment variables (systemd/gunicorn/EC2)
+# or provide a .env file that is NOT committed to git. See .env.example.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BASE_DIR / '.env')
+except ImportError:
+    pass
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'REMOVED_SECRET'
+# Set DJANGO_SECRET_KEY in the environment. The fallback is for local dev only
+# and must never be used in production.
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-dev-only-key-set-DJANGO_SECRET_KEY-in-env',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -117,11 +131,11 @@ WSGI_APPLICATION = 'usiku_beats_api.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'usiku_beats_database',
-        'USER': 'cleve',
-        'PASSWORD': 'REMOVED_SECRET',
-        'HOST': '13.36.182.150',
-        'PORT': '5432',
+        'NAME': os.environ.get('DB_NAME', 'usiku_beats_database'),
+        'USER': os.environ.get('DB_USER', 'postgres'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
     }
 }
 
